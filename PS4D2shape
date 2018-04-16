@@ -1,6 +1,5 @@
 #!/bin/bash
-#
-# See the ChangeLog for information on the individual contributions of the authors.
+# First commit of the PS4 shaping script for Destiny 2.
 
 QUANTUM=1500
 BURST=15k
