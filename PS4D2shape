@@ -92,6 +92,8 @@ then
     tc qdisc del dev $IFACE ingress 2> /dev/null > /dev/null
     tc qdisc del dev $IFB   root    2> /dev/null > /dev/null
     tc qdisc del dev $IFB   ingress 2> /dev/null > /dev/null
+    ip link set dev $IFB down 1> /dev/null > /dev/null
+    rmmod ifb 1> /dev/null > /dev/null
     exit
 fi
 
@@ -217,14 +219,7 @@ then
     tc qdisc add dev $IFB root handle 2: htb
     tc class add dev $IFB parent 2: classid 2:1 htb rate ${DSPEED}kbit
     
-    # Add filter to rule for PS4 ports and IP from servers
-    
-    for a in $HIPRIOPORTSRC
-    do
-       tc filter add dev $IFB parent 2: protocol ip prio 1 u32 match ip sport $a 0xffff flowid 2:1
-    done
-    
-    #And the remaining network clients
+    # Downlink filter.
     
     tc filter add dev $IFB protocol ip parent 2: prio 2 u32 match ip src 0.0.0.0/0 flowid 2:1
     
