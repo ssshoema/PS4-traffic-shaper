@@ -22,7 +22,7 @@ OPTIONS:
    -a <adapter> Set the adpter
    -d <rate>    Set maximum download rate (in Kbps) and/or
    -u <rate>    Set maximum upload rate (in Kbps)
-   -p           Use presets in /etc/conf.d/wondershaper.conf
+   -p           Use presets in /etc/conf.d/PS4D2sahpe.conf
    -c           Clear the limits from adapter
    -s           Show the current status of adapter
    -v           Show the current version
@@ -176,7 +176,7 @@ then
         match ip protocol 1 0xff \ 
         flowid 1:10
 
-    # Pprioritize small packets (<64 bytes)
+    # Prioritize small packets (<64 bytes)
     tc filter add dev $IFACE parent 1: protocol ip prio 12 u32 \
         match ip protocol 6 0xff \
         match u8 0x05 0x0f at 0 \
@@ -209,6 +209,9 @@ then
     # Create the IFB interface
     modprobe ifb numifbs=1
     ip link set dev $IFB up
+    #Set the interface MTU and txqeuelen
+    ifconfig ifb0 mtu 1500
+    ifconfig ifb0 txqueuelen 2
 
     # Redirect ingress (incoming) to egress ifb0
     tc qdisc add dev $IFACE handle ffff: ingress
