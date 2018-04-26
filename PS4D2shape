@@ -93,7 +93,7 @@ then
     tc qdisc del dev $IFACE ingress 2> /dev/null > /dev/null
     tc qdisc del dev $IFB   root    2> /dev/null > /dev/null
     tc qdisc del dev $IFB   ingress 2> /dev/null > /dev/null
-    ip link set dev $IFB down 1> /dev/null > /dev/null
+    ip link set dev $IFB down 2> /dev/null > /dev/null
     exit
 fi
 
