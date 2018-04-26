@@ -9,6 +9,7 @@ QUANTUM=1501
 
 # Compute your burst (buffer size): https://unix.stackexchange.com/questions/100785/bucket-size-in-tbf
 BURST=20k
+CBURST=20k
 COMMONOPTIONS="$COMMONOPTIONS"
 VERSION=1.0
 
@@ -93,7 +94,6 @@ then
     tc qdisc del dev $IFB   root    2> /dev/null > /dev/null
     tc qdisc del dev $IFB   ingress 2> /dev/null > /dev/null
     ip link set dev $IFB down 1> /dev/null > /dev/null
-    rmmod ifb 1> /dev/null > /dev/null
     exit
 fi
 
@@ -105,7 +105,7 @@ fi
 
 # Low priority OUTGOING traffic - you can leave this blank if you want
 # Low priority source netmasks
-NOPRIOHOSTSRC=
+NOPRIOHOSTSRC=80
 
 # Low priority destination netmasks
 NOPRIOHOSTDST=
@@ -118,8 +118,7 @@ NOPRIOPORTDST=
 
 #PS4 and D2 ports as supplied by bungie.net
 # High priority source ports.
-HIPRIOPORTSRC="443 1935 3478 3479 3480 7500 7501 7502 7503 7504 7505 7506 7507 7508 7509 30000 30001 30002 30003 30004 30005 30006
-30007 300008 30009 2001 3074"
+HIPRIOPORTSRC=
 
 # High priority destination ports.
 HIPRIOPORTDST="443 1935 3478 3479 3480 7500 7501 7502 7503 7504 7505 7506 7507 7508 7509 30000 30001 30002 30003 30004 30005 30006
@@ -132,33 +131,33 @@ HIPRIOPORTDST="443 1935 3478 3479 3480 7500 7501 7502 7503 7504 7505 7506 7507 7
 tc qdisc add dev $IFACE root handle 1: htb \
     default 20
 
-# Shape everything at $USPEED speed. Limits large queus
-# Main class
+# Shape everything at $USPEED speed.
+
 if [[ ! -z $USPEED ]]
 then
 
     tc class add dev $IFACE parent 1: classid 1:1 htb \
-        rate ${USPEED}kbit mtu 1500 \
-        prio 5 $COMMONOPTIONS
+        rate ${USPEED}kbit burst $BURST cburst $CBURST mtu 1500 \
+        prio 5 
 
     # High prioroity class 1:10:
 
     tc class add dev $IFACE parent 1:1 classid 1:10 htb \
-        rate $[50*$USPEED/100]kbit ceil $[95*$USPEED/100]kbit mtu 1500 \
-        prio 1 $COMMONOPTIONS
+        rate $[40*$USPEED/100]kbit ceil $[95*$USPEED/100]kbit burst $BURST cburst $CBURST mtu 1500 \
+        prio 1 
 
     # Bulk priority and default class 1:20 - gets slightly less traffic,
     #  and a lower priority:
 
     tc class add dev $IFACE parent 1:1 classid 1:20 htb \
-        rate $[30*$USPEED/100]kbit ceil $[95*$USPEED/100]kbit mtu 1500 \
-        prio 2 $COMMONOPTIONS
+        rate $[35*$USPEED/100]kbit ceil $[93*$USPEED/100]kbit burst $BURST cburst $CBURST mtu 1500 \
+        prio 2
 
     #  Low priority traffic.
 
     tc class add dev $IFACE parent 1:1 classid 1:30 htb \
-        rate $[20*$USPEED/100]kbit ceil $[90*$USPEED/100]kbit mtu 1500 \
-        prio 3 $COMMONOPTIONS
+        rate $[25*$USPEED/100]kbit ceil $[91*$USPEED/100]kbit burst $BURST cburst $CBURST mtu 1500 \
+        prio 3 
 
     # All get Stochastic Fairness:
     tc qdisc add dev $IFACE parent 1:10 handle 10: sfq perturb 10 quantum $QUANTUM
@@ -183,25 +182,29 @@ then
         match u16 0x0000 0xffc0 at 2 \
         flowid 1:10
 
-    # PS4 ports to destination
+    # PS4 ports to destination priority 1:10
+    
     for a in $HIPRIOPORTDST
     do
         tc filter add dev $IFACE parent 1: protocol ip prio 14 u32 \
             match ip dport $a 0xffff flowid 1:10
     done
 
-    # The rest is medium priority'bulk' traffic and ends up in 1:20
+    # Medium priority traffic and ends up in 1:20
 
     tc filter add dev $IFACE parent 1: protocol ip prio 16 u32 \
         match ip dst 0.0.0.0/0 flowid 1:20
         
-    # Reserved space for low priority traffic or traffic we want to squelch
-    
+    # Space for low priority traffic or traffic we want to squelch. 1:30
+     for a in $NOPRIOHOSTSRC
+    do
+        tc filter add dev $IFACE parent 1: protocol ip prio 18 u32 \
+            match ip sport $a 0xffff flowid 1:30
+    done
     
 fi
 
-###### Download shaping
-
+# Shape download with mirred ingress/egree interface ifb0
 # Creat and attach ingress policer:
 if [[ ! -z $DSPEED ]]
 then
@@ -224,6 +227,6 @@ then
     
     # Downlink filter.
     
-    tc filter add dev $IFB protocol ip parent 2: prio 2 u32 match ip src 0.0.0.0/0 burst 10k drop flowid 2:1
+    tc filter add dev $IFB protocol ip parent 2: prio 2 u32 match ip src 0.0.0.0/0 burst 20k drop flowid 2:1
     
 fi
