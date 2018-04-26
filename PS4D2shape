@@ -6,11 +6,10 @@
 # It is important to know that for precise operation quantums need to be as small as possible and larger than MTU.
 # Online test your MTU from the PS4 browser and adjust accordingly.
 QUANTUM=1501
-
 # Compute your burst (buffer size): https://unix.stackexchange.com/questions/100785/bucket-size-in-tbf
 BURST=20k
 CBURST=20k
-COMMONOPTIONS="$COMMONOPTIONS"
+#COMMONOPTIONS="$COMMONOPTIONS"
 VERSION=1.0
 
 usage()
@@ -136,27 +135,31 @@ tc qdisc add dev $IFACE root handle 1: htb \
 if [[ ! -z $USPEED ]]
 then
 
+   # Parent HTB
     tc class add dev $IFACE parent 1: classid 1:1 htb \
-        rate ${USPEED}kbit burst $BURST cburst $CBURST mtu 1500 \
+        rate ${USPEED}kbit \
+        quantum $QUANTUM burst $BURST cburst $CBURST mtu 1500 \
         prio 5 
 
     # High prioroity class 1:10:
 
     tc class add dev $IFACE parent 1:1 classid 1:10 htb \
-        rate $[40*$USPEED/100]kbit ceil $[95*$USPEED/100]kbit burst $BURST cburst $CBURST mtu 1500 \
+        rate $[40*$USPEED/100]kbit ceil $[95*$USPEED/100]kbit \
+        quantum $QUANTUM burst $BURST cburst $CBURST mtu 1500 \
         prio 1 
 
-    # Bulk priority and default class 1:20 - gets slightly less traffic,
-    #  and a lower priority:
+    # Bulk priority and default class 1:20
 
     tc class add dev $IFACE parent 1:1 classid 1:20 htb \
-        rate $[35*$USPEED/100]kbit ceil $[93*$USPEED/100]kbit burst $BURST cburst $CBURST mtu 1500 \
+        rate $[35*$USPEED/100]kbit ceil $[93*$USPEED/100]kbit \
+        quantum $QUANTUM burst $BURST cburst $CBURST mtu 1500 \
         prio 2
 
     #  Low priority traffic.
 
     tc class add dev $IFACE parent 1:1 classid 1:30 htb \
-        rate $[25*$USPEED/100]kbit ceil $[91*$USPEED/100]kbit burst $BURST cburst $CBURST mtu 1500 \
+        rate $[25*$USPEED/100]kbit ceil $[91*$USPEED/100]kbit \
+        quantum $QUANTUM burst $BURST cburst $CBURST mtu 1500 \
         prio 3 
 
     # All get Stochastic Fairness:
@@ -227,6 +230,7 @@ then
     
     # Downlink filter.
     
+    #tc filter add dev $IFB protocol ip parent 2: prio 1 u32 match ip src 0.0.0.0/0 burst 20k drop flowid 2:1
     tc filter add dev $IFB protocol ip parent 2: prio 2 u32 match ip src 0.0.0.0/0 burst 20k drop flowid 2:1
     
 fi
