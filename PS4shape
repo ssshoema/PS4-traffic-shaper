@@ -121,7 +121,7 @@ HIPRIOPORTSRC="1935 2001 1935 2001 3073 3074 3075 7500 7501 7502 7503 7504 7505 
 
 # ROOT HTB
 
-tc qdisc add dev $IFACE root handle 1: htb \
+tc qdisc add dev $IFACE root handle 1: htb burst \
     default 20
 
 # 1:10 1:20 1:20 CLASS UPLINKS
@@ -130,25 +130,25 @@ if [[ ! -z $USPEED ]]
 then
 
     tc class add dev $IFACE parent 1: classid 1:1 htb \
-        rate ${USPEED}kbit \
+        rate ${USPEED}kbit burst $BURST cburst $CBURST \
         prio 5 
 
     # High class 1:10:
 
     tc class add dev $IFACE parent 1:1 classid 1:10 htb \
-        rate $[40*$USPEED/100]kbit ceil $[95*$USPEED/100]kbit \
+        rate $[40*$USPEED/100]kbit ceil $[95*$USPEED/100]kbit burst $BURST cburst $CBURST \
         prio 1 
 
     # Meduium class 1:20 
 
     tc class add dev $IFACE parent 1:1 classid 1:20 htb \
-        rate $[35*$USPEED/100]kbit ceil $[95*$USPEED/100]kbit \
+        rate $[35*$USPEED/100]kbit ceil $[95*$USPEED/100]kbit burst $BURST cburst $CBURST \
         prio 2 
 
     # Low class 1:30
 
     tc class add dev $IFACE parent 1:1 classid 1:30 htb \
-        rate $[25*$USPEED/100]kbit ceil $[90*$USPEED/100]kbit \
+        rate $[25*$USPEED/100]kbit ceil $[90*$USPEED/100]kbit burst $BURST cburst $CBURST \
         prio 3 
 
     # SFQ:
