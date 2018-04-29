@@ -130,25 +130,25 @@ if [[ ! -z $USPEED ]]
 then
 
     tc class add dev $IFACE parent 1: classid 1:1 htb \
-        rate ${USPEED}kbit burst $BURST cburst $CBURST \
+        rate ${USPEED}kbit burst $BURST cburst $CBURST mtu $MTU \
         prio 5 
 
     # High class 1:10:
 
     tc class add dev $IFACE parent 1:1 classid 1:10 htb \
-        rate $[40*$USPEED/100]kbit ceil $[95*$USPEED/100]kbit burst $BURST cburst $CBURST \
+        rate $[40*$USPEED/100]kbit ceil $[95*$USPEED/100]kbit burst $BURST cburst $CBURST mtu $MTU \
         prio 1 
 
     # Meduium class 1:20 
 
     tc class add dev $IFACE parent 1:1 classid 1:20 htb \
-        rate $[35*$USPEED/100]kbit ceil $[95*$USPEED/100]kbit burst $BURST cburst $CBURST \
+        rate $[35*$USPEED/100]kbit ceil $[95*$USPEED/100]kbit burst $BURST cburst $CBURST mtu $MTU \
         prio 2 
 
     # Low class 1:30
 
     tc class add dev $IFACE parent 1:1 classid 1:30 htb \
-        rate $[25*$USPEED/100]kbit ceil $[90*$USPEED/100]kbit burst $BURST cburst $CBURST \
+        rate $[25*$USPEED/100]kbit ceil $[90*$USPEED/100]kbit burst $BURST cburst $CBURST mtu $MTU \
         prio 3 
 
     # SFQ:
@@ -231,7 +231,7 @@ then
     modprobe ifb numifbs=1
     ip link set dev $IFB up
     ip link set txqueuelen 2 dev $IFB 
-    ip link set mtu 9000 dev $IFB
+    ip link set mtu 1500 dev $IFB
 
     # Redirect ingress (incoming) to egress ifb0
     tc qdisc add dev $IFACE handle ffff: ingress
