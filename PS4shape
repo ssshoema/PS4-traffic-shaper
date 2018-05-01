@@ -245,3 +245,5 @@ then
     # Add filter to rule for IP address
     tc filter add dev $IFB protocol ip parent 2: prio 1 u32 match ip src 0.0.0.0/0 flowid 2:1
 fi
+#ifconfig wlan0 txqueuelen 16
+#ifconfig eth0 txqueuelen 50
