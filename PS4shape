@@ -119,7 +119,7 @@ HIPRIOPORTSRC="1935 2001 1935 2001 3073 3074 3075 7500 7501 7502 7503 7504 7505 
 
 ###### UPLINK SHAPING
 
-# ROOT HTB
+# ROOT DEFAULT HTB
 
 tc qdisc add dev $IFACE root handle 1: htb burst \
     default 20
