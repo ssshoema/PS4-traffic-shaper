@@ -122,7 +122,7 @@ HIPRIOPORTSRC="2001 3074 3075 7500 7501 7502 7503 7504 7505 7506 7507 7508 7509 
 # ROOT DEFAULT HTB
 
 tc qdisc add dev $IFACE root handle 1: htb burst \
-    default 20
+    default 22
 
 # 1:10 1:20 1:20 CLASS UPLINKS
 
@@ -183,10 +183,10 @@ then
     done
     # PS4 source ports.
 
-    for a in $HIPRIOPORTSRC
+    for b in $HIPRIOPORTSRC
     do
         tc filter add dev $IFACE parent 1: protocol ip prio 14 u32 \
-            match ip sport $a 0xffff flowid 1:20
+            match ip sport $b 0xffff flowid 1:20
     done
 
     # BULK PRIORITY 1:20
@@ -199,25 +199,25 @@ then
     for a in $NOPRIOPORTDST
     do
         tc filter add dev $IFACE parent 1: protocol ip prio 18 u32 \
-            match ip dport $a 0xffff flowid 1:30
+            match ip dport $c 0xffff flowid 1:30
     done
 
-    for a in $NOPRIOPORTSRC
+    for c in $NOPRIOPORTSRC
     do
         tc filter add dev $IFACE parent 1: protocol ip prio 19 u32 \
-            match ip sport $a 0xffff flowid 1:30
+            match ip sport $b 0xffff flowid 1:30
     done
 
-    for a in $NOPRIOHOSTSRC
+    for d in $NOPRIOHOSTSRC
     do
         tc filter add dev $IFACE parent 1: protocol ip prio 20 u32 \
-            match ip src $a flowid 1:30
+            match ip src $d flowid 1:30
     done
 
-    for a in $NOPRIOHOSTDST
+    for e in $NOPRIOHOSTDST
     do
         tc filter add dev $IFACE parent 1: protocol ip prio 21 u32 \
-            match ip dst $a flowid 1:30
+            match ip dst $e flowid 1:30
     done
 fi
 
