@@ -3,8 +3,8 @@
 #
 
 QUANTUM=1500
-BURST=15k
-CBURST=15k
+BURST=18k
+CBURST=18k
 MTU=1500
 COMMONOPTIONS="$COMMONOPTIONS"
 VERSION=1.4
@@ -136,19 +136,19 @@ then
     # High class 1:10:
 
     tc class add dev $IFACE parent 1:1 classid 1:10 htb \
-        rate $[40*$USPEED/100]kbit ceil $[95*$USPEED/100]kbit burst $BURST cburst $CBURST mtu $MTU \
+        rate $[38*$USPEED/100]kbit ceil $[95*$USPEED/100]kbit burst $BURST cburst $CBURST mtu $MTU \
         prio 1 
 
     # Meduium class 1:20 
 
     tc class add dev $IFACE parent 1:1 classid 1:20 htb \
-        rate $[35*$USPEED/100]kbit ceil $[95*$USPEED/100]kbit burst $BURST cburst $CBURST mtu $MTU \
+        rate $[33*$USPEED/100]kbit ceil $[95*$USPEED/100]kbit burst $BURST cburst $CBURST mtu $MTU \
         prio 2 
 
     # Low class 1:30
 
     tc class add dev $IFACE parent 1:1 classid 1:30 htb \
-        rate $[25*$USPEED/100]kbit ceil $[90*$USPEED/100]kbit burst $BURST cburst $CBURST mtu $MTU \
+        rate $[29*$USPEED/100]kbit ceil $[95*$USPEED/100]kbit burst $BURST cburst $CBURST mtu $MTU \
         prio 3 
 
     # SFQ:
