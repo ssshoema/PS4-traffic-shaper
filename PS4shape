@@ -3,8 +3,8 @@
 #
 
 QUANTUM=1500
-BURST=6k
-CBURST=6k
+BURST=15k
+CBURST=15k
 MTU=1500
 COMMONOPTIONS="$COMMONOPTIONS"
 VERSION=1.4
@@ -121,8 +121,8 @@ HIPRIOPORTSRC="2001 3074 3075 7500 7501 7502 7503 7504 7505 7506 7507 7508 7509 
 
 # ROOT DEFAULT HTB
 
-tc qdisc add dev $IFACE root handle 1: htb burst \
-    default 22
+tc qdisc add dev $IFACE root handle 1: htb \
+    default 20
 
 # 1:10 1:20 1:20 CLASS UPLINKS
 
@@ -196,28 +196,28 @@ then
 
 
     # LOW PRIORITY FILTERS
-    for a in $NOPRIOPORTDST
+    for c in $NOPRIOPORTDST
     do
         tc filter add dev $IFACE parent 1: protocol ip prio 18 u32 \
             match ip dport $c 0xffff flowid 1:30
     done
 
-    for c in $NOPRIOPORTSRC
+    for d in $NOPRIOPORTSRC
     do
         tc filter add dev $IFACE parent 1: protocol ip prio 19 u32 \
-            match ip sport $b 0xffff flowid 1:30
+            match ip sport $d 0xffff flowid 1:30
     done
 
-    for d in $NOPRIOHOSTSRC
+    for e in $NOPRIOHOSTSRC
     do
         tc filter add dev $IFACE parent 1: protocol ip prio 20 u32 \
-            match ip src $d flowid 1:30
+            match ip src $e flowid 1:30
     done
 
-    for e in $NOPRIOHOSTDST
+    for f in $NOPRIOHOSTDST
     do
         tc filter add dev $IFACE parent 1: protocol ip prio 21 u32 \
-            match ip dst $e flowid 1:30
+            match ip dst $f flowid 1:30
     done
 fi
 
