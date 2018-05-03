@@ -249,5 +249,5 @@ then
     tc filter add dev $IFB protocol ip parent 2: prio 1 u32 match ip src 0.0.0.0/0 flowid 2:1
 fi
 # Get PID of this process and store it.
-echo $$>/PS4shape_pid.log
+echo $$>PS4shape_pid.log
 
