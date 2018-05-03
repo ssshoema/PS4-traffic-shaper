@@ -101,7 +101,7 @@ then
     exit 1
     echo "Download set to "$DSPEED" Upload set to " $USPEED " on interface " $IFACE
 fi
-
+sleep 2
 # LOW PRIORITY BY PORT and IP. SRC=PORT OUT DEST=PORT IN.
 NOPRIOHOSTSRC=
 
