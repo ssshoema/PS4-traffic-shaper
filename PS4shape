@@ -24,13 +24,13 @@ OPTIONS:
    -s           Show the current status of adapter
    -v           Show the current version
 MODES:
-   wondershaper -a <adapter> -d <rate> -u <rate>
-   wondershaper -c -a <adapter>
-   wondershaper -s -a <adapter>
+   PS4shape -a <adapter> -d <rate> -u <rate>
+   PS4shape -c -a <adapter>
+   PS4shape -s -a <adapter>
 EXAMPLES:
-   wondershaper -a eth0 -d 1024 -u 512
-   wondershaper -a eth0 -u 512
-   wondershaper -c -a eth0
+   PS4shape -a eth0 -d 1024 -u 512
+   PS4shape -a eth0 -u 512
+   PS4shape -c -a eth0
 EOF
 }
 
@@ -59,11 +59,11 @@ done
 
 if [ "$MODE" = "presets" ]
 then
-    if [ -f /etc/conf.d/wondershaper.conf ]
+    if [ -f /etc/conf.d/PS4shape.conf ]
     then
-	source /etc/conf.d/wondershaper.conf
+	source /etc/conf.d/PS4shape.conf
     else
-	echo "/etc/conf.d/wondershaper.conf not found"
+	echo "/etc/conf.d/PS4shape.conf not found"
 	exit 1
     fi
 fi
@@ -80,6 +80,7 @@ if [ "$MODE" = "status" ]
 then
     tc -s qdisc ls dev $IFACE
     tc -s class ls dev $IFACE
+    ip link show dev ifb0
     exit
 fi
 
@@ -91,12 +92,14 @@ then
     tc qdisc del dev $IFB   ingress 2> /dev/null > /dev/null
     ip link set dev $IFB DOWN
     exit
+    echo "qdiscs cleared and ifb0 is down"
 fi
 
 if ( [[ -z $DSPEED ]] && [[ -z $USPEED ]] ) || [[ -z $IFACE ]]
 then
     usage
     exit 1
+    echo "Download set to "$DSPEED" Upload set to " $USPEED " on interface " $IFACE
 fi
 
 # LOW PRIORITY BY PORT and IP. SRC=PORT OUT DEST=PORT IN.
@@ -245,5 +248,6 @@ then
     # Add filter to rule for IP address
     tc filter add dev $IFB protocol ip parent 2: prio 1 u32 match ip src 0.0.0.0/0 flowid 2:1
 fi
-#ifconfig wlan0 txqueuelen 16
-#ifconfig eth0 txqueuelen 50
+# Get PID of this process and store it.
+echo $$>/PS4shape_pid.log
+
