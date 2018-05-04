@@ -180,6 +180,7 @@ then
         match u16 0x0000 0xffc0 at 2 \
         flowid 1:10
 	
+    # PORTS Hi and Low priority
     # Interactive Port
 
     for a in $INTERACTIVE_PORT
