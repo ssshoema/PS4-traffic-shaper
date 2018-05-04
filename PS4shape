@@ -3,8 +3,8 @@
 #
 
 QUANTUM=1500
-BURST=18k
-CBURST=18k
+BURST=12k
+CBURST=12k
 MTU=1599
 COMMONOPTIONS="$COMMONOPTIONS"
 VERSION=1.4
@@ -139,19 +139,19 @@ then
     # High class 1:10:
 
     tc class add dev $IFACE parent 1:1 classid 1:10 htb \
-        rate $[38*$USPEED/100]kbit ceil $[95*$USPEED/100]kbit burst $BURST cburst $CBURST mtu $MTU \
+        rate $[38*$USPEED/100]kbit ceil $[95*$USPEED/100]kbit \
         prio 1 
 
     # Meduium class 1:20 
 
     tc class add dev $IFACE parent 1:1 classid 1:20 htb \
-        rate $[33*$USPEED/100]kbit ceil $[95*$USPEED/100]kbit burst $BURST cburst $CBURST mtu $MTU \
+        rate $[33*$USPEED/100]kbit ceil $[95*$USPEED/100]kbit \
         prio 2 
 
     # Low class 1:30
 
     tc class add dev $IFACE parent 1:1 classid 1:30 htb \
-        rate $[29*$USPEED/100]kbit ceil $[95*$USPEED/100]kbit burst $BURST cburst $CBURST mtu $MTU \
+        rate $[29*$USPEED/100]kbit ceil $[95*$USPEED/100]kbit \
         prio 3 
 
     # SFQ:
@@ -233,7 +233,6 @@ then
     # Add the IFB interface
     modprobe ifb numifbs=1
     ip link set dev $IFB up
-    ip link set txqueuelen 2 dev $IFB 
     ip link set mtu 1500 dev $IFB
 
     # Redirect ingress (incoming) to egress ifb0
@@ -243,7 +242,7 @@ then
     
     # Add class and rules for virtual
     tc qdisc add dev $IFB root handle 2: htb
-    tc class add dev $IFB parent 2: classid 2:1 htb rate ${DSPEED}kbit 
+    tc class add dev $IFB parent 2: classid 2:1 htb rate ${DSPEED}kbit burst 12500b
     
     # Add filter to rule for IP address
     tc filter add dev $IFB protocol ip parent 2: prio 1 u32 match ip src 0.0.0.0/0 flowid 2:1
