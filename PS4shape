@@ -90,17 +90,13 @@ then
     tc qdisc del dev $IFB   ingress 2> /dev/null > /dev/null
     ip link set dev $IFB DOWN
     exit
-    echo "qdiscs cleared and ifb0 is down"
 fi
 
 if ( [[ -z $DSPEED ]] && [[ -z $USPEED ]] ) || [[ -z $IFACE ]]
 then
     usage
     exit 1
-    echo "Download set to "$DSPEED" Upload set to " $USPEED " on interface " $IFACE
 fi
-
-sleep 2
 
 #Interactive Port PS4
 INTERACTIVE_PORT=3074
@@ -180,28 +176,34 @@ then
         match u16 0x0000 0xffc0 at 2 \
         flowid 1:10
 	
-    # PORTS Hi and Low priority
+    # PORTS Hi and Low priority ports
     # Interactive Port
 
     for a in $INTERACTIVE_PORT
     do
         tc filter add dev $IFACE parent 1: protocol ip prio 13 u32 \
             match ip dport $a 0xffff flowid 1:20
+    done
+    
+    for b in $INTERACTIVE_PORT
+    do
+        tc filter add dev $IFACE parent 1: protocol ip prio 13 u32 \
+            match ip sport $b 0xffff flowid 1:20
     done	
 
     # PS4 destination ports.
 
-    for a in $HIPRIOPORTDST
+    for c in $HIPRIOPORTDST
     do
         tc filter add dev $IFACE parent 1: protocol ip prio 14 u32 \
-            match ip dport $a 0xffff flowid 1:20
+            match ip dport $c 0xffff flowid 1:20
     done
     # PS4 source ports.
 
-    for b in $HIPRIOPORTSRC
+    for d in $HIPRIOPORTSRC
     do
         tc filter add dev $IFACE parent 1: protocol ip prio 14 u32 \
-            match ip sport $b 0xffff flowid 1:20
+            match ip sport $d 0xffff flowid 1:20
     done
 
     # BULK PRIORITY 1:30 (REST OF TRAFFIC)
@@ -211,28 +213,28 @@ then
 
 
     # LOWER PRIORITY FILTERS
-    for c in $NOPRIOPORTDST
+    for e in $NOPRIOPORTDST
     do
         tc filter add dev $IFACE parent 1: protocol ip prio 18 u32 \
-            match ip dport $c 0xffff flowid 1:30
+            match ip dport $e 0xffff flowid 1:30
     done
 
-    for d in $NOPRIOPORTSRC
+    for f in $NOPRIOPORTSRC
     do
         tc filter add dev $IFACE parent 1: protocol ip prio 19 u32 \
-            match ip sport $d 0xffff flowid 1:30
+            match ip sport $f 0xffff flowid 1:30
     done
 
-    for e in $NOPRIOHOSTSRC
+    for g in $NOPRIOHOSTSRC
     do
         tc filter add dev $IFACE parent 1: protocol ip prio 20 u32 \
-            match ip src $e flowid 1:30
+            match ip src $g flowid 1:30
     done
 
-    for f in $NOPRIOHOSTDST
+    for h in $NOPRIOHOSTDST
     do
         tc filter add dev $IFACE parent 1: protocol ip prio 21 u32 \
-            match ip dst $f flowid 1:30
+            match ip dst $h flowid 1:30
     done
 fi
 
