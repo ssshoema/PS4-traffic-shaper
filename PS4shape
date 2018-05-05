@@ -17,7 +17,7 @@ OPTIONS:
    -a <adapter> Set the adpter
    -d <rate>    Set maximum download rate (in Kbps) and/or
    -u <rate>    Set maximum upload rate (in Kbps)
-   -p           Use presets in /etc/conf.d/wondershaper.conf
+   -p           Use presets in /etc/conf.d/PS4shape.conf
    -c           Clear the limits from adapter
    -s           Show the current status of adapter
    -v           Show the current version
@@ -187,7 +187,7 @@ then
     
     for b in $INTERACTIVE_PORT
     do
-        tc filter add dev $IFACE parent 1: protocol ip prio 13 u32 \
+        tc filter add dev $IFACE parent 1: protocol ip prio 14 u32 \
             match ip sport $b 0xffff flowid 1:20
     done	
 
@@ -195,45 +195,45 @@ then
 
     for c in $HIPRIOPORTDST
     do
-        tc filter add dev $IFACE parent 1: protocol ip prio 14 u32 \
+        tc filter add dev $IFACE parent 1: protocol ip prio 15 u32 \
             match ip dport $c 0xffff flowid 1:20
     done
     # PS4 source ports.
 
     for d in $HIPRIOPORTSRC
     do
-        tc filter add dev $IFACE parent 1: protocol ip prio 14 u32 \
+        tc filter add dev $IFACE parent 1: protocol ip prio 16 u32 \
             match ip sport $d 0xffff flowid 1:20
     done
 
     # BULK PRIORITY 1:30 (REST OF TRAFFIC)
 
-    tc filter add dev $IFACE parent 1: protocol ip prio 16 u32 \
+    tc filter add dev $IFACE parent 1: protocol ip prio 18 u32 \
         match ip dst 0.0.0.0/0 flowid 1:30
 
 
     # LOWER PRIORITY FILTERS
     for e in $NOPRIOPORTDST
     do
-        tc filter add dev $IFACE parent 1: protocol ip prio 18 u32 \
+        tc filter add dev $IFACE parent 1: protocol ip prio 20 u32 \
             match ip dport $e 0xffff flowid 1:30
     done
 
     for f in $NOPRIOPORTSRC
     do
-        tc filter add dev $IFACE parent 1: protocol ip prio 19 u32 \
+        tc filter add dev $IFACE parent 1: protocol ip prio 21 u32 \
             match ip sport $f 0xffff flowid 1:30
     done
 
     for g in $NOPRIOHOSTSRC
     do
-        tc filter add dev $IFACE parent 1: protocol ip prio 20 u32 \
+        tc filter add dev $IFACE parent 1: protocol ip prio 22 u32 \
             match ip src $g flowid 1:30
     done
 
     for h in $NOPRIOHOSTDST
     do
-        tc filter add dev $IFACE parent 1: protocol ip prio 21 u32 \
+        tc filter add dev $IFACE parent 1: protocol ip prio 23 u32 \
             match ip dst $h flowid 1:30
     done
 fi
@@ -245,7 +245,7 @@ if [[ ! -z $DSPEED ]]
 then
 
     # Add the IFB interface
-    modprobe ifb numifbs=1
+    modprobe ifb
     ip link set dev $IFB up
     ip link set mtu 1500 dev $IFB
 
