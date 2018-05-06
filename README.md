@@ -21,7 +21,7 @@ Find your own MTU (QUANTUM) value and edit if needed.
 Use the dslreports speed test which includes bufferbloat grade. http://www.dslreports.com/speedtest
 Initiate the script with sudo ./PS4shape -a eth# -d numeric -u numeric where eth# is your WAN card, -d is 85 to 95% of ISP plan download speed and -u is 85-95% of ISP plan upload speed of the test.
 My initial test on a 2Mbps up and 20Mbps down = Download 24.7 Upload 2.4 Grade C D A.
-Test with script initiated sudo ./PS4shape -a eth3 -d 19500 -u 1800 = Download 19.2 Upload 18.2 Grade A+ A A+.
+Test with script initiated sudo ./PS4shape -a eth3 -d 19500 -u 1800 = Download 19.2 Upload 1.8 Grade A+ A A+.
 Clear the qdiscs and edit  -d -u numbers to fine tune if needed.
 Tuning of traffic classes is pretty straight forward in the CLASS UPLINK section for rate and ceiling.
 If you are a novice and plan on tuning in the classes recommended reading is advised. Google tc qdis htb.
