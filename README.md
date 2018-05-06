@@ -3,7 +3,7 @@ Initially based on wondershaper 1.4 (The recent wondershaper version)
 Goal 1 - Reduce gaming bufferbloat, prioritize PS4 console, and port priority for Destiny 2.
 Goal 2 - Not to block or "severely" minimalize traffic for the rest of LAN.
 
-Using tc qdisc to shape the ingress and egress of network with prioritization on the PS4 gaming system and Destiny 2 game with port, TOS,ICMP, and <64 byte packet prioritization.
+Using tc qdisc to shape the ingress and egress of network with prioritization on the PS4 gaming system and Destiny 2 game with port, TOS, ICMP, and <64 byte packet prioritization.
 
 There are multiple methods available for network shaping so a google search may yield better solutions for traffic shaping in your case. This is not intended as an all encompassing solution. Mileage may vary for multiple reasons.
 
@@ -24,4 +24,4 @@ My initial test on a 2Mbps up and 20Mbps down = Download 24.7 Upload 2.4 Grade C
 Test with script initiated sudo ./PS4shape -a eth3 -d 19500 -u 1800 = Download 19.2 Upload 1.8 Grade A+ A A+.
 Clear the qdiscs and edit  -d -u numbers to fine tune if needed.
 Tuning of traffic classes is pretty straight forward in the CLASS UPLINK section for rate and ceiling.
-If you are a novice and plan on tuning in the classes recommended reading is advised. Google tc qdis htb.
+If you are a novice and plan on tuning in the classes recommended reading is advised. Google tc qdisc htb.
