@@ -5,7 +5,7 @@
 QUANTUM=1500
 BURST=6k
 COMMONOPTIONS="$COMMONOPTIONS"
-VERSION=1.4
+VERSION=1.0
 
 usage()
 {
@@ -78,7 +78,7 @@ if [ "$MODE" = "status" ]
 then
     tc -s qdisc ls dev $IFACE
     tc -s class ls dev $IFACE
-    ip link show dev ifb0
+    ifconfig $IFB
     exit
 fi
 
@@ -88,7 +88,7 @@ then
     tc qdisc del dev $IFACE ingress 2> /dev/null > /dev/null
     tc qdisc del dev $IFB   root    2> /dev/null > /dev/null
     tc qdisc del dev $IFB   ingress 2> /dev/null > /dev/null
-    ip link set dev $IFB DOWN
+    ip link set dev $IFB down
     exit
 fi
 
@@ -125,7 +125,7 @@ HIPRIOPORTSRC="2001 3075 7500 7501 7502 7503 7504 7505 7506 7507 7508 7509 28608
 # ROOT DEFAULT HTB
 
 tc qdisc add dev $IFACE root handle 1: htb \
-    default 20 burst 1500 cburst 1500
+    default 20 
 
 # 1:10 1:20 1:30 CLASS UPLINKS
 
@@ -134,7 +134,7 @@ then
 
     tc class add dev $IFACE parent 1: classid 1:1 htb \
         rate ${USPEED}kbit \
-        prio 5 
+        prio 5 $COMMONOPTIONS
 
     # High class 1:10:
 
@@ -245,8 +245,9 @@ if [[ ! -z $DSPEED ]]
 then
 
     # Add the IFB interface
-    modprobe ifb
+    modprobe ifb numifbs=1
     ip link set dev $IFB up
+    ip link set dev $IFB txqueuelen 32
     ip link set mtu 1500 dev $IFB
 
     # Redirect ingress (incoming) to egress ifb0
@@ -256,11 +257,10 @@ then
     
     # Add class and rules for virtual
     tc qdisc add dev $IFB root handle 2: htb
-    tc class add dev $IFB parent 2: classid 2:1 htb rate ${DSPEED}kbit burst 12k
+    tc class add dev $IFB parent 2: classid 2:1 htb rate ${DSPEED}kbit 
     
     # Add filter to rule for IP address
     tc filter add dev $IFB protocol ip parent 2: prio 1 u32 match ip src 0.0.0.0/0 flowid 2:1
 fi
 # Get PID of this process and store it.
 echo $$>PS4shape_pid.log
-
