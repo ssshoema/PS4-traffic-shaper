@@ -37,7 +37,6 @@ USPEED=
 IFACE=
 IFB="ifb0"
 MODE=
-LANFACE=eth2
 
 while getopts hvd:u:a:pcs o
 do	case "$o" in
@@ -293,7 +292,7 @@ tc class add dev $LANFACE parent 3: classid 3:1 htb \
     # Meduium class 3:20 
 
     tc class add dev $LANFACE parent 3:1 classid 3:20 htb \
-        rate $[40*$LUSPEED/100]kbit ceil $[90*$LUSPEED/100]kbit \
+        rate $[40*$LUSPEED/100]kbit ceil $[95*$LUSPEED/100]kbit \
         prio 2 $COMMONOPTIONS
         
      # FILTERS
@@ -353,10 +352,6 @@ tc class add dev $LANFACE parent 3: classid 3:1 htb \
         
    # LAN DOWNLINK SHAPING WITH IFB INGRESS/EGRESS
 
-# INGRESS POLICER
-if [[ ! -z $DSPEED ]]
-then
-
     # Add the IFB1 interface
     ip link set dev $IFB1 up
     ip link set dev $IFB1 txqueuelen 32
@@ -369,11 +364,12 @@ then
     
     # Add class and rules for virtual
     tc qdisc add dev $IFB1 root handle 2: htb
-    tc class add dev $IFB1 parent 2: classid 3:1 htb rate ${LDSPEED}kbit 
+    tc class add dev $IFB1 parent 3: classid 3:1 htb rate $[60*$LUSPEED/100]kbit
+    tc class add dev $IFB1 parent 3: classid 3:2 htb rate $[40*$LUSPEED/100]kbit
     
     # Add filter to rule for IP address
-    tc filter add dev $IFB1 protocol ip parent 3: prio 1 u32 match ip src 10.42.0.201/32 flowid 2:1
-    tc filter add dev $IFB1 protocol ip parent 3: prio 2 u32 match ip src 10.42.0.1/25 flowid 2:1
+    tc filter add dev $IFB1 protocol ip parent 3:1 prio 1 u32 match ip dst 10.42.0.201/32 flowid 3:1
+    tc filter add dev $IFB1 protocol ip parent 3:2 prio 2 u32 match ip dst 10.42.0.1/25 flowid 3:1
 fi
 
 
