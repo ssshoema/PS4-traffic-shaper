@@ -363,7 +363,7 @@ tc class add dev $LANFACE parent 3: classid 3:1 htb \
         action mirred egress redirect dev $IFB1
     
     # Add class and rules for virtual
-    tc qdisc add dev $IFB1 root handle 2: htb
+    tc qdisc add dev $IFB1 root handle 3: htb
     tc class add dev $IFB1 parent 3: classid 3:1 htb rate $[60*$LUSPEED/100]kbit
     tc class add dev $IFB1 parent 3: classid 3:2 htb rate $[40*$LUSPEED/100]kbit
     
