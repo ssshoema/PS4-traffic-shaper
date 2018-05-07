@@ -285,7 +285,7 @@ tc class add dev $LANFACE parent 3: classid 3:1 htb \
  
   # High class 3:10:
 
-    tc class add dev $ALNFACE parent 3:1 classid 3:10 htb \
+    tc class add dev $LANFACE parent 3:1 classid 3:10 htb \
         rate $[60*$LUSPEED/100]kbit ceil $[95*$LUSPEED/100]kbit \
         prio 1 $COMMONOPTIONS
 
