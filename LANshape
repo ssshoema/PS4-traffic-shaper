@@ -38,7 +38,7 @@ IFACE=
 IFB="ifb0"
 MODE=
 LAN_DEV="eth2"
-LAN_SPEED="90Mbps
+LAN_SPEED="90000"
 LAN_SUBNET="10.42.0.0"
 
 while getopts hvd:u:a:pcs o
@@ -129,6 +129,11 @@ HIPRIOPORTSRC="2001 3075 7500 7501 7502 7503 7504 7505 7506 7507 7508 7509 28608
 
 tc qdisc add dev $IFACE root handle 1: htb \
     default 20 
+ 
+ # LAN CLASS   
+ tc class add dev $LAN_DEV parent 1: classid 1:2 htb rate ${LAN_SPEED}kbit quantum 1500
+ # LAN CHILD
+ tc class add dev $LAN_DEV parent 1:2 classid 1:3 htb rate $(($LAN_SPEED-$USPEED))kbit quantum 1500
 
 # 1:10 1:20 1:30 CLASS UPLINKS
 
@@ -139,11 +144,7 @@ then
         rate ${USPEED}kbit \
         prio 5 $COMMONOPTIONS
 	
-    tc class add dev $LAN_DEV parent 1: classid 1:1 htb \
-        rate $LAN_SPEED \
-        prio 5 
-	
-    # High class 1:10:
+   # High class 1:10:
 
     tc class add dev $IFACE parent 1:1 classid 1:10 htb \
         rate $[38*$USPEED/100]kbit ceil $[95*$USPEED/100]kbit \
@@ -274,9 +275,9 @@ then
     tc qdisc add dev $IFACE handle ffff: ingress
     
     #LAN EXCLUSION
-    tc filter add dev $LAN_DEV parent ffff: prio 1 u32
-    match ip src $LAN_SUBNET/24
-    match ip dst $LAN_SUBNET/24
+    tc filter add dev $DEV parent ffff: prio 1 u32 \
+    match ip src $LAN_SUBNET/24 \
+    match ip dst $LAN_SUBNET/24 \
     flowid :1
     
     tc filter add dev $IFACE parent ffff: protocol ip u32 match u32 0 0 \
@@ -287,5 +288,5 @@ then
     tc class add dev $IFB parent 2: classid 2:1 htb rate ${DSPEED}kbit 
     
     # Add filter to rule for IP address
-    tc filter add dev $IFB protocol ip parent 2: prio 1 u32 match ip src 0.0.0.0/0 flowid 2:1
+    tc filter add dev $IFB protocol ip parent 2: prio 1 u32 match ip src 0.0.0.0/0 burst 10k drop flowid 2:1
 fi
