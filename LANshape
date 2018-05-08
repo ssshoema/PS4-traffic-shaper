@@ -139,6 +139,10 @@ then
         rate ${USPEED}kbit \
         prio 5 $COMMONOPTIONS
 	
+    tc class add dev $LAN_DEV parent 1: classid 1:1 htb \
+        rate $LAN_SPEED \
+        prio 5 
+	
     # High class 1:10:
 
     tc class add dev $IFACE parent 1:1 classid 1:10 htb \
