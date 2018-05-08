@@ -37,8 +37,8 @@ USPEED=
 IFACE=
 IFB="ifb0"
 MODE=
-LAN_DEV=eth2
-LAN_SPEED="100000"
+LAN_DEV="eth2"
+LAN_SPEED="90Mbps
 LAN_SUBNET="10.42.0.0"
 
 while getopts hvd:u:a:pcs o
@@ -89,8 +89,6 @@ if [ "$MODE" = "clear" ]
 then
     tc qdisc del dev $IFACE root    2> /dev/null > /dev/null
     tc qdisc del dev $IFACE ingress 2> /dev/null > /dev/null
-    tc qdisc del dev $LANFACE root    2> /dev/null > /dev/null
-    tc qdisc del dev $LANFACE ingress 2> /dev/null > /dev/null
     tc qdisc del dev $IFB   root    2> /dev/null > /dev/null
     tc qdisc del dev $IFB   ingress 2> /dev/null > /dev/null
     ip link set dev $IFB down
@@ -141,12 +139,6 @@ then
         rate ${USPEED}kbit \
         prio 5 $COMMONOPTIONS
 	
-    # LAN FILTER	
-    tc filter add dev $LAN_DEV parent 1:0 protocol ip prio 1 u32
-        match ip src $LAN_SUBNET/24
-        match ip dst $LAN_SUBNET/24
-        flowid 1:3
-
     # High class 1:10:
 
     tc class add dev $IFACE parent 1:1 classid 1:10 htb \
@@ -171,7 +163,12 @@ then
     tc qdisc add dev $IFACE parent 1:30 handle 30: sfq perturb 10 quantum $QUANTUM
 
     # FILTERS
-
+    # LAN FILTER	
+    tc filter add dev $LAN_DEV parent 1:0 protocol ip prio 1 u32
+        match ip src $LAN_SUBNET/24
+        match ip dst $LAN_SUBNET/24
+        flowid 1:3
+	
     # TOS 1:10:
     tc filter add dev $IFACE parent 1: protocol ip prio 10 u32 \
         match ip tos 0x10 0xff  flowid 1:10
