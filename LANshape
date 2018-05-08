@@ -197,7 +197,7 @@ then
         tc filter add dev $IFACE parent 1: protocol ip prio 13 u32 \
             match ip dport $a 0xffff flowid 1:20
 	tc filter add dev $LAN_DEV parent 1: protocol ip prio 13 u32 \
-            match ip dport $a 0xffff flowid 1:20
+            match ip dport $a 0xffff flowid 1:2
     done
     
     for b in $INTERACTIVE_PORT
@@ -205,7 +205,7 @@ then
         tc filter add dev $IFACE parent 1: protocol ip prio 14 u32 \
             match ip sport $b 0xffff flowid 1:20
 	tc filter add dev $LAN_DEV parent 1: protocol ip prio 14 u32 \
-            match ip sport $a 0xffff flowid 1:20
+            match ip sport $a 0xffff flowid 1:3
     done	
 
     # PS4 destination ports.
@@ -215,7 +215,7 @@ then
         tc filter add dev $IFACE parent 1: protocol ip prio 15 u32 \
             match ip dport $c 0xffff flowid 1:20
 	tc filter add dev $LAN_DEV parent 1: protocol ip prio 15 u32 \
-            match ip dport $a 0xffff flowid 1:20
+            match ip dport $a 0xffff flowid 1:2
     done
     # PS4 source ports.
 
@@ -224,7 +224,7 @@ then
         tc filter add dev $IFACE parent 1: protocol ip prio 16 u32 \
             match ip sport $d 0xffff flowid 1:20
 	tc filter add dev $LAN_DEV parent 1: protocol ip prio 16 u32 \
-            match ip sport $a 0xffff flowid 1:20
+            match ip sport $a 0xffff flowid 1:3
     done
 
     # BULK PRIORITY 1:30 (REST OF TRAFFIC)
