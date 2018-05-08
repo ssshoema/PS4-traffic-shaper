@@ -141,6 +141,7 @@ then
         rate ${USPEED}kbit \
         prio 5 $COMMONOPTIONS
 	
+    # LAN FILTER	
     tc filter add dev $LAN_DEV parent 1:0 protocol ip prio 1 u32
         match ip src $LAN_SUBNET/24
         match ip dst $LAN_SUBNET/24
