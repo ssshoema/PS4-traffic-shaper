@@ -347,7 +347,7 @@ tc class add dev $LANFACE parent 3: classid 3:1 htb \
     tc filter add dev $LANFACE parent 3: protocol ip prio 18 u32 \
         match ip dst 10.42.0.201/32 flowid 3:10
         
-     tc filter add dev $LANFACE parent 3: protocol ip prio 20 u32 \
+     tc filter add dev $LANFACE parent 3: protocol ip prio 19 u32 \
         match ip dst 0.0.0.0/25 flowid 3:20
         
    # LAN DOWNLINK SHAPING WITH IFB INGRESS/EGRESS
@@ -368,8 +368,8 @@ tc class add dev $LANFACE parent 3: classid 3:1 htb \
     tc class add dev $IFB1 parent 4: classid 4:2 htb rate $[40*$LUSPEED/100]kbit
     
     # Add filter to rule for IP address
-    tc filter add dev $IFB1 protocol ip parent 4:1 prio 1 u32 match ip dst 10.42.0.201/32 flowid 3:1
-    tc filter add dev $IFB1 protocol ip parent 4:2 prio 2 u32 match ip dst 10.42.0.1/25 flowid 3:1
+    tc filter add dev $IFB1 protocol ip parent 4:1 prio 1 u32 match ip dst 10.42.0.201/32 flowid 4:1
+    tc filter add dev $IFB1 protocol ip parent 4:2 prio 2 u32 match ip dst 10.42.0.1/25 flowid 4:1
 
 
     
