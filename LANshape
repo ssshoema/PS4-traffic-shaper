@@ -37,6 +37,9 @@ USPEED=
 IFACE=
 IFB="ifb0"
 MODE=
+LAN_DEV=eth2
+LAN_SPEED="100000"
+LAN_SUBNET="10.42.0.0"
 
 while getopts hvd:u:a:pcs o
 do	case "$o" in
@@ -101,7 +104,7 @@ then
 fi
 
 #Interactive Port PS4
-INTERACTIVE_PORT=3074
+INTERACTIVE_PORT="3074"
 
 # LOW PRIORITY BY PORT and IP. SRC=PORT OUT DEST=PORT IN.
 # LOW priority source netmasks
@@ -137,6 +140,11 @@ then
     tc class add dev $IFACE parent 1: classid 1:1 htb \
         rate ${USPEED}kbit \
         prio 5 $COMMONOPTIONS
+	
+    tc filter add dev $LAN_DEV parent 1:0 protocol ip prio 1 u32
+        match ip src $LAN_SUBNET/24
+        match ip dst $LAN_SUBNET/24
+        flowid 1:3
 
     # High class 1:10:
 
@@ -185,12 +193,16 @@ then
     do
         tc filter add dev $IFACE parent 1: protocol ip prio 13 u32 \
             match ip dport $a 0xffff flowid 1:20
+	tc filter add dev $LAN_DEV parent 1: protocol ip prio 13 u32 \
+            match ip dport $a 0xffff flowid 1:20
     done
     
     for b in $INTERACTIVE_PORT
     do
         tc filter add dev $IFACE parent 1: protocol ip prio 14 u32 \
             match ip sport $b 0xffff flowid 1:20
+	tc filter add dev $LAN_DEV parent 1: protocol ip prio 14 u32 \
+            match ip sport $a 0xffff flowid 1:20
     done	
 
     # PS4 destination ports.
@@ -199,6 +211,8 @@ then
     do
         tc filter add dev $IFACE parent 1: protocol ip prio 15 u32 \
             match ip dport $c 0xffff flowid 1:20
+	tc filter add dev $LAN_DEV parent 1: protocol ip prio 15 u32 \
+            match ip dport $a 0xffff flowid 1:20
     done
     # PS4 source ports.
 
@@ -206,6 +220,8 @@ then
     do
         tc filter add dev $IFACE parent 1: protocol ip prio 16 u32 \
             match ip sport $d 0xffff flowid 1:20
+	tc filter add dev $LAN_DEV parent 1: protocol ip prio 16 u32 \
+            match ip sport $a 0xffff flowid 1:20
     done
 
     # BULK PRIORITY 1:30 (REST OF TRAFFIC)
@@ -245,15 +261,22 @@ fi
 # INGRESS POLICER
 if [[ ! -z $DSPEED ]]
 then
-
-    # Add the IFB interface
-    modprobe ifb numifbs=2
+    
+    #Add IFB interface
+    modprobe ifb numifbs=1
     ip link set dev $IFB up
     ip link set dev $IFB txqueuelen 32
     ip link set mtu 1500 dev $IFB
 
     # Redirect ingress (incoming) to egress ifb0
     tc qdisc add dev $IFACE handle ffff: ingress
+    
+    #LAN EXCLUSION
+    tc filter add dev $LAN_DEV parent ffff: prio 1 u32
+    match ip src $LAN_SUBNET/24
+    match ip dst $LAN_SUBNET/24
+    flowid :1
+    
     tc filter add dev $IFACE parent ffff: protocol ip u32 match u32 0 0 \
         action mirred egress redirect dev $IFB
     
@@ -264,114 +287,3 @@ then
     # Add filter to rule for IP address
     tc filter add dev $IFB protocol ip parent 2: prio 1 u32 match ip src 0.0.0.0/0 flowid 2:1
 fi
-########################
-#LAN SHAPING
-LDSPEED=900000
-LUSPEED=900000
-LANFACE=eth2
-IFB1="ifb1"
-
-# ROOT DEFAULT HTB
-
-tc qdisc add dev $LANFACE root handle 3: htb \
-    default 20 
-    
-#PARENT CLASS
-tc class add dev $LANFACE parent 3: classid 3:1 htb \
-        rate 90000kbit \
-        prio 5 $COMMONOPTIONS
-        
- #LEAF CLASS
- 
-  # High class 3:10:
-
-    tc class add dev $LANFACE parent 3:1 classid 3:10 htb \
-        rate $[60*$LUSPEED/100]kbit ceil $[95*$LUSPEED/100]kbit \
-        prio 1 $COMMONOPTIONS
-
-    # Meduium class 3:20 
-
-    tc class add dev $LANFACE parent 3:1 classid 3:20 htb \
-        rate $[40*$LUSPEED/100]kbit ceil $[95*$LUSPEED/100]kbit \
-        prio 2 $COMMONOPTIONS
-        
-     # FILTERS
-
-    # TOS 3:10:
-    tc filter add dev $LANFACE parent 3: protocol ip prio 10 u32 \
-        match ip tos 0x10 0xff  flowid 3:10
-
-    # ICMP 3:10:    
-    tc filter add dev $LANFACE parent 3: protocol ip prio 11 u32 \
-        match ip protocol 1 0xff flowid 3:10
-
-    # PACKETS <64 bytes 3:10:
-    tc filter add dev $LANFACE parent 3: protocol ip prio 12 u32 \
-        match ip protocol 6 0xff \
-        match u8 0x05 0x0f at 0 \
-        match u16 0x0000 0xffc0 at 2 \
-        flowid 3:10
-        
-    # LAN PORTS Hi and Low priority ports
-    # Interactive Port
-
-    for a in $INTERACTIVE_PORT
-    do
-        tc filter add dev $LANFACE parent 3: protocol ip prio 13 u32 \
-            match ip dport $a 0xffff flowid 3:20
-    done
-    
-    for b in $INTERACTIVE_PORT
-    do
-        tc filter add dev $LANFACE parent 3: protocol ip prio 14 u32 \
-            match ip sport $b 0xffff flowid 3:20
-    done	
-
-    # PS4 destination ports.
-
-    for c in $HIPRIOPORTDST
-    do
-        tc filter add dev $LANFACE parent 3: protocol ip prio 15 u32 \
-            match ip dport $c 0xffff flowid 3:20
-    done
-    # PS4 source ports.
-
-    for d in $HIPRIOPORTSRC
-    do
-        tc filter add dev $LANFACE parent 3: protocol ip prio 16 u32 \
-            match ip sport $d 0xffff flowid 3:20
-    done
-
-    # PS4 3:10 THEN BULK PRIORITY 3:20 (REST OF TRAFFIC)
-
-    tc filter add dev $LANFACE parent 3: protocol ip prio 18 u32 \
-        match ip dst 10.42.0.201/32 flowid 3:10
-        
-     tc filter add dev $LANFACE parent 3: protocol ip prio 19 u32 \
-        match ip dst 0.0.0.0/25 flowid 3:20
-        
-   # LAN DOWNLINK SHAPING WITH IFB INGRESS/EGRESS
-
-    # Add the IFB1 interface
-    ip link set dev $IFB1 up
-    ip link set dev $IFB1 txqueuelen 32
-    ip link set mtu 1500 dev $IFB1
-
-    # Redirect ingress (incoming) to egress ifb1
-    tc qdisc add dev $LANFACE handle ffff: ingress
-    tc filter add dev $LANFACE parent ffff: protocol ip u32 match u32 0 0 \
-        action mirred egress redirect dev $IFB1
-    
-    # Add class and rules for virtual
-    tc qdisc add dev $IFB1 root handle 4: htb
-    tc class add dev $IFB1 parent 4: classid 4:1 htb rate $[60*$LUSPEED/100]kbit
-    tc class add dev $IFB1 parent 4: classid 4:2 htb rate $[40*$LUSPEED/100]kbit
-    
-    # Add filter to rule for IP address
-    tc filter add dev $IFB1 protocol ip parent 4:1 prio 1 u32 match ip dst 10.42.0.201/32 flowid 4:1
-    tc filter add dev $IFB1 protocol ip parent 4:2 prio 2 u32 match ip dst 10.42.0.1/25 flowid 4:1
-
-
-    
-
-
