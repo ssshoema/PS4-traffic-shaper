@@ -1,12 +1,11 @@
 #!/bin/bash
 
-
 # WAN INTERFACE
 WAN_INTERFACE=eth3
 
 # LAN INTERFACE
 LAN_INTERFACE=eth2
-LAN_NETWORK=10.42.0/24
+LAN_NETWORK=10.42.0.0/24
 
 # WAN DOWNLOAD SPEED
 MAX_DOWNRATE=19500kbit
@@ -20,7 +19,7 @@ MAX_UPRATE=1900kbit
 # 90% OF WAN UPLOAD
 USE_UPPERCENT=0.90
 
-#LAN UP/DOWN SPEED
+# LAN UP/DOWN SPEED
 LANUP=90mbit
 LANDOWN=90mbit
 
@@ -129,12 +128,11 @@ for i in $INTERACTIVE_PORT 7500 7501 7502 7503 7504 7505 7506 7507 7508 7509 286
 done
 $TC filter add dev $LAN_INTERFACE protocol ip parent 1:0 prio 1 u32 match ip dport $INTERACTIVE_PORT 0xfc00 flowid 1:10
 
-# FILTER LOW PORT PRORITY
-for i in 22 2001 3075 7500 7501 7502 7503 7504 7505 7506 7507 7508 75099; do
+# FILTER LOW PORT NUMBER PRORITY
+for i in 22 2001 3075 7500 7501 7502 7503 7504 7505 7506 7507 7508 7509; do
   $TC filter add dev $LAN_INTERFACE protocol ip parent 1:0 prio 1 u32 match ip sport $i 0xffff flowid 1:10
   $TC filter add dev $LAN_INTERFACE protocol ip parent 1:0 prio 1 u32 match ip dport $i 0xffff flowid 1:10
 done
-
 
 # LAN IP OF PS4 PRIROITY
 $TC filter add dev $LAN_INTERFACE protocol ip parent 1:0 prio 1 u32 match ip src $PS4IP flowid 1:10
