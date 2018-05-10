@@ -29,11 +29,12 @@ PS4IP=10.42.0.201/32
 # INTERACTIVE PORT FOR PS4
 INTERACTIVE_PORT=3074
 
-# REMOVE EXISTING QDISCS
+# REMOVE EXISTING QDISCS AND IPTABLES MARK
 $TC qdisc del dev $WAN_INTERFACE root 2> /dev/null
 $TC qdisc del dev $WAN_INTERFACE ingress 2> /dev/null
 $TC qdisc del dev $LAN_INTERFACE root 2> /dev/null
 $TC qdisc del dev $LAN_INTERFACE ingress 2> /dev/null
+/usr/sbin/iptables -t mangle -D PREROUTING -p tcp -m length --length 0:128 -j MARK --set-mark 2
 
 # COMPUTATIONS
 MAX_UPNUM=`echo $MAX_UPRATE | sed 's/[^0-9]//g'`
