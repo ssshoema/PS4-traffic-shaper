@@ -21,8 +21,11 @@ MAX_UPRATE=1900kbit
 USE_UPPERCENT=0.90
 
 #LAN UP/DOWN SPEED
-LANUP=90000
-LANDOWN=90000
+LANUP=90mbit
+LANDOWN=90mbit
+
+# PS4 LAN IP
+PS4IP=10.42.0.201/32
 
 # INTERACTIVE PORT FOR PS4
 INTERACTIVE_PORT=3074
@@ -67,119 +70,84 @@ MAX_DOWNRATE_INGRESS="${MAX_DOWNRATE_INGRESSNUM}${MAX_DOWNBASE}"
 $TC qdisc add dev $WAN_INTERFACE handle ffff: ingress
 
 # PORT PRIORITY PS4 GAMING
-for i in $INTERACTIVE_PORT 30000 31000 32000 33000 34000 35000 36000 37000 38000 39000 40000 41000; do
-# recent xbox games enjoy using high ports -- the same port numbers which
-# client OSes occasionally also use for source ports for bulk traffic (e.g.
-# http for streaming) -- so, don't prioritize high source ports, only high
-# dest ports (that is, only prioritize streams connecting to ports the gaming
-# servers are listening on)
-#  $TC filter add dev $WAN_INTERFACE protocol ip parent 1:0 prio 1 u32 match ip sport $i 0xfc00 flowid 1:10
+for i in $INTERACTIVE_PORT 7500 7501 7502 7503 7504 7505 7506 7507 7508 7509 28608 30000 30001 30002 30003 30004 30005 30006 30007 30008 30009; do
+# FILTER DESTINATION PORT
+# $TC filter add dev $WAN_INTERFACE protocol ip parent 1:0 prio 1 u32 match ip sport $i 0xfc00 flowid 1:10
   $TC filter add dev $WAN_INTERFACE protocol ip parent 1:0 prio 1 u32 match ip dport $i 0xfc00 flowid 1:10
-# policer:
-#  $TC filter add dev $WAN_INTERFACE parent ffff: protocol ip prio 1 u32 match ip sport $i 0xfc00 flowid :1
+# POLICER DESTINATION PORT
+# $TC filter add dev $WAN_INTERFACE parent ffff: protocol ip prio 1 u32 match ip sport $i 0xfc00 flowid :1
   $TC filter add dev $WAN_INTERFACE parent ffff: protocol ip prio 1 u32 match ip dport $i 0xfc00 flowid :1
 done
-# do prioritize low xbox source port, some games still use this port range for a source port
-# (in that case it doesn't matter which port they listen on; the client connects
-# from the low source port to any server-side port)
+
+# INTERACTIVE PORT 3074 DESTINATION AND SOURCE
 $TC filter add dev $WAN_INTERFACE protocol ip parent 1:0 prio 1 u32 match ip sport $INTERACTIVE_PORT 0xfc00 flowid 1:10
-# policer:
+# POLICER
 $TC filter add dev $WAN_INTERFACE parent ffff: protocol ip prio 1 u32 match ip sport $INTERACTIVE_PORT 0xfc00 flowid :1
 
-# prioritize additional single ports: ssh, VPN, webex, google hangouts
-# audio / video. VPN port (4500) may also be used for AT&T / t-mobile phone
-# calls over wifi, and Apple Facetime uses ports around 3xxx, which are already
-# prioritized for xbox. in fact it's probably safe to prioritize any low
-# source AND dest ports (lower than 20,000) other than 80 and 443 (but we
-# don't do that here)
-for i in 22 4500 9000 19302 19303 19304 19305 19306 19307 19308 19309; do
+# FILTER LOW PORT PRORITY
+for i in 22 2001 3075 7500 7501 7502 7503 7504 7505 7506 7507 7508 7509; do
   $TC filter add dev $WAN_INTERFACE protocol ip parent 1:0 prio 1 u32 match ip sport $i 0xffff flowid 1:10
   $TC filter add dev $WAN_INTERFACE protocol ip parent 1:0 prio 1 u32 match ip dport $i 0xffff flowid 1:10
-# policer:
+# POLICER
   $TC filter add dev $WAN_INTERFACE parent ffff: protocol ip prio 1 u32 match ip sport $i 0xffff flowid :1
   $TC filter add dev $WAN_INTERFACE parent ffff: protocol ip prio 1 u32 match ip dport $i 0xffff flowid :1
 done
 
-# also VPN IP range - set this if you know your corporate VPN IP range
-#$TC filter add dev $WAN_INTERFACE protocol ip parent 1:0 prio 1 u32 match ip src 1.2.3.4/24 flowid 1:10
-#$TC filter add dev $WAN_INTERFACE protocol ip parent 1:0 prio 1 u32 match ip dst 1.2.3.4/24 flowid 1:10
-# policer:
-#$TC filter add dev $WAN_INTERFACE parent ffff: protocol ip prio 1 u32 match ip src 1.2.3.4/24 flowid :1
-#$TC filter add dev $WAN_INTERFACE parent ffff: protocol ip prio 1 u32 match ip dst 1.2.3.4/24 flowid :1
-
-# also icmp
+# ICMP PRIORITY
 $TC filter add dev $WAN_INTERFACE protocol ip parent 1:0 prio 1 u32 match ip protocol 1 0xff flowid 1:10
-# policer:
+# POLICER
 $TC filter add dev $WAN_INTERFACE parent ffff: protocol ip prio 1 u32 match ip protocol 1 0xff flowid :1
 
-# prioritize ack (iptables-marked packets)
+# ACK PRIORITY IPTABLES MARKED
 $TC filter add dev $WAN_INTERFACE protocol ip parent 1:0 prio 2 handle 2 fw flowid 1:10
-# policer:
+# POLICER
 $TC filter add dev $WAN_INTERFACE parent ffff: protocol ip prio 2 handle 2 fw flowid :1
 
-# add SFQ (or fq_codel if you have at least kernel 3.16 or so)
-# (or any anti-bufferbloat qdisc such as cake, if you have an ever newer kernel)
-
-# NOTE:
-# I tried running without hfsc, and only using fq_codel -- it doesn't work as well
-# as running with both hfsc and SFQ. that is, xbox gaming latency went to hell cuz
-# fq_codel didn't know when to start dropping packets. however, once you have hfsc
-# in the mix any FQ-like qdisc should work here.
-
-# UPDATE:
-# I recommend using SFQ *instead* of fq_codel, at least on slow / 32-bit / embedded
-# systems. In my anecdotal testing, fq_codel can slow down streams more than SFQ
-# does, and introduce a bit of latency.
-
+# ADD SFQ
 $TC qdisc add dev $WAN_INTERFACE parent 1:10 handle 30: sfq perturb 10
 $TC qdisc add dev $WAN_INTERFACE parent 1:11 handle 40: sfq perturb 10
-#$TC qdisc add dev $WAN_INTERFACE parent 1:10 handle 30: fq_codel
-#$TC qdisc add dev $WAN_INTERFACE parent 1:11 handle 40: fq_codel
 
-# enact policer for all other traffic
+# POLICER FOR REMAINING WAN TRAFFIC
 $TC filter add dev $WAN_INTERFACE parent ffff: protocol ip prio 50 u32 match ip src 0.0.0.0/0 police rate $MAX_DOWNRATE_INGRESS burst 20k drop flowid :2
 
-
-# install HFSC under LAN to limit download
+###LAN TRAFFIC###
+# LAN HFSC
 $TC qdisc add dev $LAN_INTERFACE root handle 1: hfsc default 11
-$TC class add dev $LAN_INTERFACE parent 1: classid 1:1 hfsc sc rate 1000mbit ul rate 1000mbit
-$TC class add dev $LAN_INTERFACE parent 1:1 classid 1:10 hfsc sc umax 1540 dmax 5ms rate 900mbit ul rate 900mbit
+$TC class add dev $LAN_INTERFACE parent 1: classid 1:1 hfsc sc rate 100mbit ul rate 100mbit
+$TC class add dev $LAN_INTERFACE parent 1:1 classid 1:10 hfsc sc umax 1540 dmax 5ms rate $LANUP ul rate $LANUP
 $TC class add dev $LAN_INTERFACE parent 1:1 classid 1:11 hfsc sc umax 1540 dmax 5ms rate $HALF_MAXDOWN ul rate $NEAR_MAX_DOWNRATE
 
-# prioritize local LAN traffic
+# LAN TRAFFIC PRIORITY
 $TC filter add dev $LAN_INTERFACE protocol ip parent 1:0 prio 1 u32 match ip src $LAN_NETWORK match ip dst $LAN_NETWORK flowid 1:10
 
-# prioritize interactive port blocks: xbox gaming
+# PS4 PORT PRIORITY
 # see above for why we only prioritize the source port and not the dest port here
 # (in this case source port is remote host's port)
-for i in $INTERACTIVE_PORT 30000 31000 32000 33000 34000 35000 36000 37000 38000 39000 40000 41000; do
+for i in $INTERACTIVE_PORT 7500 7501 7502 7503 7504 7505 7506 7507 7508 7509 28608 30000 30001 30002 30003 30004 30005 30006 30007 30008 30009; do
   $TC filter add dev $LAN_INTERFACE protocol ip parent 1:0 prio 1 u32 match ip sport $i 0xfc00 flowid 1:10
-#  $TC filter add dev $LAN_INTERFACE protocol ip parent 1:0 prio 1 u32 match ip dport $i 0xfc00 flowid 1:10
+# $TC filter add dev $LAN_INTERFACE protocol ip parent 1:0 prio 1 u32 match ip dport $i 0xfc00 flowid 1:10
 done
 $TC filter add dev $LAN_INTERFACE protocol ip parent 1:0 prio 1 u32 match ip dport $INTERACTIVE_PORT 0xfc00 flowid 1:10
 
-# additional single ports: ssh, VPN, webex, google hangouts
-for i in 22 4500 9000 19302 19303 19304 19305 19306 19307 19308 19309; do
+# FILTER LOW PORT PRORITY
+for i in 22 2001 3075 7500 7501 7502 7503 7504 7505 7506 7507 7508 75099; do
   $TC filter add dev $LAN_INTERFACE protocol ip parent 1:0 prio 1 u32 match ip sport $i 0xffff flowid 1:10
   $TC filter add dev $LAN_INTERFACE protocol ip parent 1:0 prio 1 u32 match ip dport $i 0xffff flowid 1:10
 done
 
-# also VPN IP range - set this if you know your corporate VPN IP range
-#$TC filter add dev $LAN_INTERFACE protocol ip parent 1:0 prio 1 u32 match ip src 1.2.3.4/24 flowid 1:10
-#$TC filter add dev $LAN_INTERFACE protocol ip parent 1:0 prio 1 u32 match ip dst 1.2.3.4/24 flowid 1:10
 
-# also icmp
+# LAN IP OF PS4 PRIROITY
+$TC filter add dev $LAN_INTERFACE protocol ip parent 1:0 prio 1 u32 match ip src $PS4IP flowid 1:10
+$TC filter add dev $LAN_INTERFACE protocol ip parent 1:0 prio 1 u32 match ip dst $PS4IP flowid 1:10
+# POLICER
+$TC filter add dev $LAN_INTERFACE parent ffff: protocol ip prio 1 u32 match ip src $PS4IP flowid :1
+$TC filter add dev $LAN_INTERFACE parent ffff: protocol ip prio 1 u32 match ip dst $PS4IP flowid :1
+# POLICER FOR REMAINING LAN TRAFFIC
+$TC filter add dev $LAN_INTERFACE parent ffff: protocol ip prio 50 u32 match ip src 10.42.0.0/25 police rate $MAX_DOWNRATE_INGRESS burst 20k drop flowid :2
+
+# LAN ICMP
 $TC filter add dev $LAN_INTERFACE protocol ip parent 1:0 prio 1 u32 match ip protocol 1 0xff flowid 1:10
 
-## OPTIONAL:
-## prioritize any marked packets - use iptables to mark any other prioritized traffic;
-## use iptables -t mangle -A PREROUTING -j MARK --set-mark 1 (plus other options)
-## NOTE: this is different from ack marking above -- you'd use this with complex iptables rules, e.g. to not
-## rate-limit web traffic to/from a specific IP
-#$TC filter add dev $LAN_INTERFACE protocol ip parent 1:0 prio 2 handle 1 fw flowid 1:10
-
-# add SFQ / fq_codel / cake / etc (see notes above)
+# LAN SFQ
 $TC qdisc add dev $LAN_INTERFACE parent 1:10 handle 30: sfq perturb 10
 $TC qdisc add dev $LAN_INTERFACE parent 1:11 handle 40: sfq perturb 10
-#$TC qdisc add dev $LAN_INTERFACE parent 1:10 handle 30: fq_codel
-#$TC qdisc add dev $LAN_INTERFACE parent 1:11 handle 40: fq_codel
