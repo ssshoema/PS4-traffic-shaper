@@ -1,115 +1,39 @@
 #!/bin/bash
 
-# As the "bufferbloat" folks have recently re-discovered and/or more widely
-# publicized, congestion avoidance algorithms (such as those found in TCP) do
-# a great job of allowing network endpoints to negotiate transfer rates that
-# maximize a link's bandwidth usage without unduly penalizing any particular
-# stream. This allows bulk transfer streams to use the maximum available
-# bandwidth without affecting the latency of non-bulk (e.g. interactive)
-# streams.
 
-# In other words, TCP lets you have your cake and eat it too -- both fast
-# downloads and low latency all at the same time.
+# WAN INTERFACE
+WAN_INTERFACE=eth3
 
-# However, this only works if TCP's afore-mentioned congestion avoidance
-# algorithms actually kick in. The most reliable method of signaling
-# congestion is to drop packets. (There are other ways, such as ECN, but
-# unfortunately they're still not in wide use.)
+# LAN INTERFACE
+LAN_INTERFACE=eth2
+LAN_NETWORK=10.42.0/24
 
-# Dropping packets to make the network work better is kinda counter-intuitive.
-# But, that's how TCP works. And if you take advantage of that, you can make
-# TCP work great.
+# WAN DOWNLOAD SPEED
+MAX_DOWNRATE=19500kbit
 
-# Dropping packets gets TCP's attention and fast. The sending endpoint
-# throttles back to avoid further network congestion. In other words, your
-# fast download slows down. Then, as long as there's no further congestion,
-# the sending endpoint gradually increases the transfer rate. Then the cycle
-# repeats. It can get a lot more complex than that simple explanation, but the
-# main point is: dropping packets when there's congestion is good.
-
-# Traffic shaping is all about slowing down and/or dropping (or ECN marking)
-# packets. The thing is, it's much better for latency to simply drop packets
-# than it is to slow them down. Linux has a couple of traffic shapers that
-# aren't afraid to drop packets. One of the most well-known is TBF, the Token
-# Bucket Filter. Normally it slows down packets to a specific rate. But, it
-# also accepts a "limit" option to specify the maximum number of packets to
-# queue. When the limit is exceeded, packets are dropped.
-
-# TBF's simple "tail-drop" algorithm is actually one of the worst kinds of
-# "active queue management" (AQM) that you can do. But even still, it can make
-# a huge difference. Applying TBF alone (with a short enough limit) can make a
-# maddeningly high-latency link usable again in short order.
-
-# TBF's big disadvantage is that it's a "classless" shaper. That means you
-# can't prioritize one TCP stream over another. That's where HTB, the
-# Hierarchical Token Bucket, comes in. HTB uses the same general algorithm as
-# TBF while also allowing you to filter specific traffic to prioritized queues.
-
-# But HTB has a big weakness: it doesn't have a good, easy way of specifying a
-# queue limit like TBF does. That means, compared to TBF, HTB is much more
-# inclined to slow packets rather than to drop them. That hurts latency, bad.
-
-# So now we come to Linux traffic shaping's best kept secret: the HFSC shaper.
-# HFSC stands for Hierarchical Fair Service Curve. The linux implementation is
-# a complex beast, enough so to have a 9 part question about it on serverfault
-# ( http://serverfault.com/questions/105014/does-anyone-really-understand-how-hfsc-scheduling-in-linux-bsd-works ).
-# Nonetheless, HFSC can be understood in a simplified way as HTB with limits.
-# HFSC allows you to classify traffic (like HTB, unlike TBF), but it also has
-# no fear of dropping packets (unlike HTB, like TBF).
-
-# HFSC does a great job of keeping latency low. With it, it's possible to fully
-# saturate a link while maintaining perfect non-bulk session interactivity.
-# It is the holy grail of traffic shaping, and it's in the stock kernel.
-
-# To get the best results, HFSC should be combined with SFQ (Stochastic
-# Fairness Queueing) and optionally an ingress filter. If all three are used,
-# it's possible to maintain low-latency interactive sessions even without any
-# traffic prioritization. Further adding prioritization then maximizes
-# interactivity.
-
-# Here's how it's done:
-
-# set this to your internet-facing network interface:
-WAN_INTERFACE=eth1
-
-# set this to your local network interface:
-LAN_INTERFACE=eth0
-LAN_NETWORK=192.168.1.0/24
-
-# how fast is your downlink?
-MAX_DOWNRATE=6144kbit
-
-# how close should we get to max down? e.g. 95%
+# 95% OF WAN DOWNLOAD
 USE_DOWNPERCENT=0.95
 
-# how fast is your uplink?
-MAX_UPRATE=384kbit
+# WAN UPLOAD
+MAX_UPRATE=1900kbit
 
-# how close should we get to max up? e.g. 90%
+# 90% OF WAN UPLOAD
 USE_UPPERCENT=0.90
 
-# what port do you want to prioritize? e.g. for ssh, use 22
-# 3074 for xbox
+#LAN UP/DOWN SPEED
+LANUP=90000
+LANDOWN=90000
+
+# INTERACTIVE PORT FOR PS4
 INTERACTIVE_PORT=3074
-# NOTE: port 22 is prioritized as well, see below for the full list of
-# prioritized ports. (this script has been updated to use some loops to make
-# adding / removing ports easier, and I've added a number of xbox-related
-# ports.)
 
-## now for the magic
-# set this to the path to your tc binary
-#TC=/usr/sbin/tc
-TC=/sbin/tc
-
-# remove any existing qdiscs
-# this lets you re-run this script as much as you want to try different
-# settings, we're always starting fresh
+# REMOVE EXISTING QDISCS
 $TC qdisc del dev $WAN_INTERFACE root 2> /dev/null
 $TC qdisc del dev $WAN_INTERFACE ingress 2> /dev/null
 $TC qdisc del dev $LAN_INTERFACE root 2> /dev/null
 $TC qdisc del dev $LAN_INTERFACE ingress 2> /dev/null
 
-# computations
+# COMPUTATIONS
 MAX_UPNUM=`echo $MAX_UPRATE | sed 's/[^0-9]//g'`
 MAX_UPBASE=`echo $MAX_UPRATE | sed 's/[0-9]//g'`
 MAX_DOWNNUM=`echo $MAX_DOWNRATE | sed 's/[^0-9]//g'`
@@ -127,27 +51,22 @@ HALF_MAXUP="${HALF_MAXUPNUM}${MAX_UPBASE}"
 HALF_MAXDOWNNUM=$(( $MAX_DOWNNUM / 2 ))
 HALF_MAXDOWN="${HALF_MAXDOWNNUM}${MAX_DOWNBASE}"
 
-## mark small packets - i.e. ACKs
-## (run this once and/or add it to your regular IP tables rules) -- this iptables command
-# only needs to run once per reboot, whereas the rest of this script can be run as often
-# as you like to try different settings (the qdiscs are cleared / reset at the top of the script)
-#/usr/sbin/iptables -t mangle -A PREROUTING -p tcp -m length --length 0:128 -j MARK --set-mark 2
+## MARK SMALL PACKETS WITH IPTABLES
+/usr/sbin/iptables -t mangle -A PREROUTING -p tcp -m length --length 0:128 -j MARK --set-mark 2
 
-# install HFSC under WAN to limit upload
+# INSTALL WAN HFSC
 $TC qdisc add dev $WAN_INTERFACE root handle 1: hfsc default 11
 $TC class add dev $WAN_INTERFACE parent 1: classid 1:1 hfsc sc rate $NEAR_MAX_UPRATE ul rate $NEAR_MAX_UPRATE
 $TC class add dev $WAN_INTERFACE parent 1:1 classid 1:10 hfsc sc umax 1540 dmax 5ms rate $HALF_MAXUP ul rate $NEAR_MAX_UPRATE
 $TC class add dev $WAN_INTERFACE parent 1:1 classid 1:11 hfsc sc umax 1540 dmax 5ms rate $HALF_MAXUP ul rate $HALF_MAXUP
 #$TC class add dev $WAN_INTERFACE parent 1:1 classid 1:11 hfsc sc umax 1540 dmax 5ms rate $HALF_MAXUP ul rate $NEAR_MAX_UPRATE
 
-# install ingress filter to limit download to 97% max
+# WAN INGRESS FILTER AT 97%
 MAX_DOWNRATE_INGRESSNUM=`echo "$MAX_DOWNNUM * 0.97" | bc | xargs printf "%.0f"`
 MAX_DOWNRATE_INGRESS="${MAX_DOWNRATE_INGRESSNUM}${MAX_DOWNBASE}"
 $TC qdisc add dev $WAN_INTERFACE handle ffff: ingress
-# NOTE: we route all prioritized traffic through the ingress filter with NO policing;
-# that is, we do not police-limit prioritized traffic.
 
-# prioritize interactive port blocks: xbox gaming
+# PORT PRIORITY PS4 GAMING
 for i in $INTERACTIVE_PORT 30000 31000 32000 33000 34000 35000 36000 37000 38000 39000 40000 41000; do
 # recent xbox games enjoy using high ports -- the same port numbers which
 # client OSes occasionally also use for source ports for bulk traffic (e.g.
