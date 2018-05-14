@@ -1,83 +1,4 @@
 #!/bin/bash
-
-# WAN INTERFACE
-WAN_INTERFACE=eth3
-
-# LAN INTERFACE
-LAN_INTERFACE=eth2
-LAN_NETWORK=10.42.0.0/24
-
-# WAN DOWNLOAD SPEED
-MAX_DOWNRATE=19500kbit
-
-# 95% OF WAN DOWNLOAD
-USE_DOWNPERCENT=0.95
-
-# WAN UPLOAD
-MAX_UPRATE=1900kbit
-
-# 90% OF WAN UPLOAD
-USE_UPPERCENT=0.90
-
-# LAN UP/DOWN SPEED
-LANUP=90mbit
-LANDOWN=90mbit
-
-# PS4 LAN IP
-PS4IP=10.42.0.201/32
-
-# INTERACTIVE PORT FOR PS4
-INTERACTIVE_PORT=3074
-
-# REMOVE EXISTING QDISCS AND IPTABLES MARK
-$TC qdisc del dev $WAN_INTERFACE root 2> /dev/null
-$TC qdisc del dev $WAN_INTERFACE ingress 2> /dev/null
-$TC qdisc del dev $LAN_INTERFACE root 2> /dev/null
-$TC qdisc del dev $LAN_INTERFACE ingress 2> /dev/null
-/usr/sbin/iptables -t mangle -D PREROUTING -p tcp -m length --length 0:128 -j MARK --set-mark 2
-
-# COMPUTATIONS
-MAX_UPNUM=`echo $MAX_UPRATE | sed 's/[^0-9]//g'`
-MAX_UPBASE=`echo $MAX_UPRATE | sed 's/[0-9]//g'`
-MAX_DOWNNUM=`echo $MAX_DOWNRATE | sed 's/[^0-9]//g'`
-MAX_DOWNBASE=`echo $MAX_DOWNRATE | sed 's/[0-9]//g'`
-
-NEAR_MAX_UPNUM=`echo "$MAX_UPNUM * $USE_UPPERCENT" | bc | xargs printf "%.0f"`
-NEAR_MAX_UPRATE="${NEAR_MAX_UPNUM}${MAX_UPBASE}"
-
-NEAR_MAX_DOWNNUM=`echo "$MAX_DOWNNUM * $USE_DOWNPERCENT" | bc | xargs printf "%.0f"`
-NEAR_MAX_DOWNRATE="${NEAR_MAX_DOWNNUM}${MAX_DOWNBASE}"
-
-HALF_MAXUPNUM=$(( $MAX_UPNUM / 2 ))
-HALF_MAXUP="${HALF_MAXUPNUM}${MAX_UPBASE}"
-
-HALF_MAXDOWNNUM=$(( $MAX_DOWNNUM / 2 ))
-HALF_MAXDOWN="${HALF_MAXDOWNNUM}${MAX_DOWNBASE}"
-
-## MARK SMALL PACKETS WITH IPTABLES
-/usr/sbin/iptables -t mangle -A PREROUTING -p tcp -m length --length 0:128 -j MARK --set-mark 2
-
-# INSTALL WAN HFSC
-$TC qdisc add dev $WAN_INTERFACE root handle 1: hfsc default 11
-$TC class add dev $WAN_INTERFACE parent 1: classid 1:1 hfsc sc rate $NEAR_MAX_UPRATE ul rate $NEAR_MAX_UPRATE
-$TC class add dev $WAN_INTERFACE parent 1:1 classid 1:10 hfsc sc umax 1540 dmax 5ms rate $HALF_MAXUP ul rate $NEAR_MAX_UPRATE
-$TC class add dev $WAN_INTERFACE parent 1:1 classid 1:11 hfsc sc umax 1540 dmax 5ms rate $HALF_MAXUP ul rate $HALF_MAXUP
-#$TC class add dev $WAN_INTERFACE parent 1:1 classid 1:11 hfsc sc umax 1540 dmax 5ms rate $HALF_MAXUP ul rate $NEAR_MAX_UPRATE
-
-# WAN INGRESS FILTER AT 97%
-MAX_DOWNRATE_INGRESSNUM=`echo "$MAX_DOWNNUM * 0.97" | bc | xargs printf "%.0f"`
-MAX_DOWNRATE_INGRESS="${MAX_DOWNRATE_INGRESSNUM}${MAX_DOWNBASE}"
-$TC qdisc add dev $WAN_INTERFACE handle ffff: ingress
-
-# PORT PRIORITY PS4 GAMING
-for i in $INTERACTIVE_PORT 7500 7501 7502 7503 7504 7505 7506 7507 7508 7509 28608 30000 30001 30002 30003 30004 30005 30006 30007 30008 30009; do
-# FILTER DESTINATION PORT
-# $TC filter add dev $WAN_INTERFACE protocol ip parent 1:0 prio 1 u32 match ip sport $i 0xfc00 flowid 1:10
-  $TC filter add dev $WAN_INTERFACE protocol ip parent 1:0 prio 1 u32 match ip dport $i 0xfc00 flowid 1:10
-# POLICER DESTINATION PORT
-# $TC filter add dev $WAN_INTERFACE parent ffff: protocol ip prio 1 u32 match ip sport $i 0xfc00 flowid :1
-  $TC filter add dev $WAN_INTERFACE parent ffff: protocol ip prio 1 u32 match ip dport $i 0xfc00 flowid :1
-#!/bin/bash
 # PS4 shaping. Port directions specific to PS4, Bungie, and Destiny 2.
 # See README for details.
 
@@ -116,6 +37,9 @@ USPEED=
 IFACE=
 IFB="ifb0"
 MODE=
+LANFACE"eth0"
+LANMASK"10.42.0.0/24"
+LANSPEED"90mbit"
 
 while getopts hvd:u:a:pcs o
 do	case "$o" in
@@ -167,7 +91,12 @@ then
     tc qdisc del dev $IFACE ingress 2> /dev/null > /dev/null
     tc qdisc del dev $IFB   root    2> /dev/null > /dev/null
     tc qdisc del dev $IFB   ingress 2> /dev/null > /dev/null
+    tc qdisc del dev $LANFACE root 2> /dev/null
+    tc qdisc del dev $LANFACE ingress 2> /dev/null
+    tc qdisc del dev eth10   root    2> /dev/null > /dev/null
+    tc qdisc del dev eth10   ingress 2> /dev/null > /dev
     ip link set dev $IFB down
+    ip link set dev eth10 down
     exit
 fi
 
@@ -202,10 +131,30 @@ HIPRIOPORTSRC="2001 3075 7500 7501 7502 7503 7504 7505 7506 7507 7508 7509 28608
 ###### UPLINK SHAPING
 
 # ROOT DEFAULT HTB
-
+# WAN ROOT
 tc qdisc add dev $IFACE root handle 1: htb \
     default 20 
+ # LAN ROOT
+tc qdisc add dev $LANFACE root handle 1: htb \
+    default 20
+    
+# LAN CLASSES
 
+ tc class add dev $LANFACE parent 1: classid 1:1 htb rate $LANSPEED prio 1 $COMMONOPTIONS
+ tc class add dev $LANFACE parent 1:1 classid 1:10 htb $LANSPEED prio 2 $COMMONOPTIONS 
+ tc class add dev $LANFACE parent 1:1 classid 1:20 htb 50mbit prio 10 $COMMONOPTIONS 
+ 
+ #LAN FILTERS
+ 
+ tc filter add dev $LANFACE protocol ip parent 1:0 prio 1 u32 match ip sport $INTERACTIVE_PORT 0xffff flowid 1:10
+ tc filter add dev $LANFACE protocol ip parent 1:0 prio 1 u32 match ip dport $INTERACTIVE_PORT 0xffff flowid 1:10
+ 
+ #LAN SFQ
+ 
+tc qdisc add dev $LAN_INTERFACE parent 1:10 handle 30: sfq perturb 10 quantum $QUANTUM
+tc qdisc add dev $LAN_INTERFACE parent 1:11 handle 40: sfq perturb 10 quantum $QUANTUM
+
+# WAN CLASSES
 # 1:10 1:20 1:30 CLASS UPLINKS
 
 if [[ ! -z $USPEED ]]
@@ -323,23 +272,38 @@ fi
 if [[ ! -z $DSPEED ]]
 then
 
-    # Add the IFB interface
+    # ADD the IFB interface
     modprobe ifb numifbs=1
     ip link set dev $IFB up
     ip link set dev $IFB txqueuelen 32
     ip link set mtu 1500 dev $IFB
+    
+    # ADD eth10
+    lsmod | grep dummy
+    modprobe dummy
+    ip link set name eth10 dev dummy0
+    ip addr add 10.42.0.202/24 brd + dev eth10 label eth10:0
+    ip link set dev eth10 up
+    ip link set dev eth10 txqueuelen 32
+    ip link set mtu 1500 dev eth10
 
-    # Redirect ingress (incoming) to egress ifb0
+    # Redirect  WAN ingress (incoming) to egress ifb0
     tc qdisc add dev $IFACE handle ffff: ingress
     tc filter add dev $IFACE parent ffff: protocol ip u32 match u32 0 0 \
         action mirred egress redirect dev $IFB
+	
+    # Redirect LAN ingress (incoming) to egress eth10
+    tc qdisc add dev $LANFACE handle ffff: ingress
+    tc filter add dev $LANFACE parent ffff: protocol ip u32 match u32 0 0 \
+        action mirred egress redirect dev eth10
     
     # Add class and rules for virtual
     tc qdisc add dev $IFB root handle 2: htb
+    tc qdisc add dev eth10 root handle 3: htb
     tc class add dev $IFB parent 2: classid 2:1 htb rate ${DSPEED}kbit 
+    tc class add dev eth10 parent 3: classid 3:1 htb rate $LANSPEED
     
     # Add filter to rule for IP address
     tc filter add dev $IFB protocol ip parent 2: prio 1 u32 match ip src 0.0.0.0/0 flowid 2:1
+    tc filter add dev eth10 protocol ip parent 3: prio 1 u32 match ip dst $LANMASK flowid 3:1
 fi
-# Get PID of this process and store it.
-echo $$>PS4shape_pid.log
