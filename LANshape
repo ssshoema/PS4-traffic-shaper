@@ -37,9 +37,9 @@ USPEED=
 IFACE=
 IFB="ifb0"
 MODE=
-LANFACE"eth0"
-LANMASK"10.42.0.0/24"
-LANSPEED"90mbit"
+LANFACE="eth0"
+LANMASK="10.42.0.0/24"
+LANSPEED="90mbit"
 
 while getopts hvd:u:a:pcs o
 do	case "$o" in
@@ -167,19 +167,19 @@ then
     # High class 1:10:
 
     tc class add dev $IFACE parent 1:1 classid 1:10 htb \
-        rate $[38*$USPEED/100]kbit ceil $[95*$USPEED/100]kbit \
+        rate $((38*$USPEED/100))kbit ceil $((95*$USPEED/100))kbit \
         prio 1 $COMMONOPTIONS
 
     # Meduium class 1:20 
 
     tc class add dev $IFACE parent 1:1 classid 1:20 htb \
-        rate $[33*$USPEED/100]kbit ceil $[93*$USPEED/100]kbit \
+        rate $((33*$USPEED/100))kbit ceil $((93*$USPEED/100))kbit \
         prio 2 $COMMONOPTIONS
 
     # Low class 1:30
 
     tc class add dev $IFACE parent 1:1 classid 1:30 htb \
-        rate $[29*$USPEED/100]kbit ceil $[91*$USPEED/100]kbit \
+        rate $((29*$USPEED/100))kbit ceil $((91*$USPEED/100))kbit \
         prio 3 $COMMONOPTIONS
 
     # SFQ:
