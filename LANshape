@@ -36,10 +36,11 @@ DSPEED=
 USPEED=
 IFACE=
 IFB="ifb0"
+IFB1="ifb1"
 MODE=
 LANFACE="eth0"
 LANMASK="10.42.0.0/24"
-LANSPEED="90mbit"
+LANSPEED="90000kbit"
 
 while getopts hvd:u:a:pcs o
 do	case "$o" in
@@ -93,10 +94,10 @@ then
     tc qdisc del dev $IFB   ingress 2> /dev/null > /dev/null
     tc qdisc del dev $LANFACE root 2> /dev/null
     tc qdisc del dev $LANFACE ingress 2> /dev/null
-    tc qdisc del dev eth10   root    2> /dev/null > /dev/null
-    tc qdisc del dev eth10   ingress 2> /dev/null > /dev
+    tc qdisc del dev $IFB1   root    2> /dev/null > /dev/null
+    tc qdisc del dev $IFB1   ingress 2> /dev/null > /dev
     ip link set dev $IFB down
-    ip link set dev eth10 down
+    ip link set dev $IFB1 down
     exit
 fi
 
@@ -135,24 +136,32 @@ HIPRIOPORTSRC="2001 3075 7500 7501 7502 7503 7504 7505 7506 7507 7508 7509 28608
 tc qdisc add dev $IFACE root handle 1: htb \
     default 20 
  # LAN ROOT
-tc qdisc add dev $LANFACE root handle 1: htb \
-    default 20
+tc qdisc add dev $LANFACE root handle 2: htb \
+    default 10
     
 # LAN CLASSES
 
- tc class add dev $LANFACE parent 1: classid 1:1 htb rate $LANSPEED prio 1 $COMMONOPTIONS
- tc class add dev $LANFACE parent 1:1 classid 1:10 htb $LANSPEED prio 2 $COMMONOPTIONS 
- tc class add dev $LANFACE parent 1:1 classid 1:20 htb 50mbit prio 10 $COMMONOPTIONS 
+ tc class add dev $LANFACE parent 2: classid 2:1 htb \
+        rate 100mbit \
+        prio 3 $COMMONOPTIONS
+
+ tc class add dev $LANFACE parent 2:1 classid 2:10 htb \
+        rate 75mbit ceil 95mbit \
+        prio 1 $COMMONOPTIONS
+ 
+ tc class add dev $LANFACE parent 2:1 classid 2:20 htb \
+        rate 25mbit ceil 90mbit \
+        prio 2 $COMMONOPTIONS
  
  #LAN FILTERS
  
- tc filter add dev $LANFACE protocol ip parent 1:0 prio 1 u32 match ip sport $INTERACTIVE_PORT 0xffff flowid 1:10
- tc filter add dev $LANFACE protocol ip parent 1:0 prio 1 u32 match ip dport $INTERACTIVE_PORT 0xffff flowid 1:10
+ tc filter add dev $LANFACE protocol ip parent 2:0 prio 1 u32 match ip sport $INTERACTIVE_PORT 0xffff flowid 1:10
+ tc filter add dev $LANFACE protocol ip parent 2:0 prio 1 u32 match ip dport $INTERACTIVE_PORT 0xffff flowid 1:10
  
  #LAN SFQ
- 
-tc qdisc add dev $LAN_INTERFACE parent 1:10 handle 30: sfq perturb 10 quantum $QUANTUM
-tc qdisc add dev $LAN_INTERFACE parent 1:11 handle 40: sfq perturb 10 quantum $QUANTUM
+
+ tc qdisc add dev $LANFACE parent 2:10 handle 10: sfq perturb 10 quantum $QUANTUM
+ tc qdisc add dev $LANFACE parent 2:20 handle 20: sfq perturb 10 quantum $QUANTUM
 
 # WAN CLASSES
 # 1:10 1:20 1:30 CLASS UPLINKS
@@ -273,20 +282,15 @@ if [[ ! -z $DSPEED ]]
 then
 
     # ADD the IFB interface
-    modprobe ifb numifbs=1
+    modprobe ifb
     ip link set dev $IFB up
+    ip link set dev $IFB1 up
     ip link set dev $IFB txqueuelen 32
+    ip link set dev $IFB1 txqueuelen 32
     ip link set mtu 1500 dev $IFB
+    ip link set mtu 1500 dev $IFB1
     
-    # ADD eth10
-    lsmod | grep dummy
-    modprobe dummy
-    ip link set name eth10 dev dummy0
-    ip addr add 10.42.0.202/24 brd + dev eth10 label eth10:0
-    ip link set dev eth10 up
-    ip link set dev eth10 txqueuelen 32
-    ip link set mtu 1500 dev eth10
-
+    
     # Redirect  WAN ingress (incoming) to egress ifb0
     tc qdisc add dev $IFACE handle ffff: ingress
     tc filter add dev $IFACE parent ffff: protocol ip u32 match u32 0 0 \
@@ -295,15 +299,16 @@ then
     # Redirect LAN ingress (incoming) to egress eth10
     tc qdisc add dev $LANFACE handle ffff: ingress
     tc filter add dev $LANFACE parent ffff: protocol ip u32 match u32 0 0 \
-        action mirred egress redirect dev eth10
+        action mirred egress redirect dev $IFB1
     
     # Add class and rules for virtual
     tc qdisc add dev $IFB root handle 2: htb
-    tc qdisc add dev eth10 root handle 3: htb
+    tc qdisc add dev $IFB1 root handle 3: htb
     tc class add dev $IFB parent 2: classid 2:1 htb rate ${DSPEED}kbit 
-    tc class add dev eth10 parent 3: classid 3:1 htb rate $LANSPEED
+    tc class add dev $IFB1 parent 3: classid 3:1 htb rate $LANSPEED
     
     # Add filter to rule for IP address
     tc filter add dev $IFB protocol ip parent 2: prio 1 u32 match ip src 0.0.0.0/0 flowid 2:1
-    tc filter add dev eth10 protocol ip parent 3: prio 1 u32 match ip dst $LANMASK flowid 3:1
+    tc filter add dev $IFB1 protocol ip parent 3: prio 1 u32 match ip dst 10.42.0.201/32 flowid 3:1
+    tc filter add dev $IFB1 protocol ip parent 3: prio 10 u32 match ip dst 10.42.0.0/25 flowid 3:1
 fi
