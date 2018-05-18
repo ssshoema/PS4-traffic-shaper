@@ -1,11 +1,20 @@
 #!/bin/bash
-# PS4 shaping. Port directions specific to PS4, Bungie, and Destiny 2.
-# See README for details.
+# Wonder Shaper
+#
+# Set the following values to somewhat less than your actual download
+# and uplink speed. In kilobits. Also set the device that is to be shaped.
+#
+# License GPLv2 <https://gnu.org/licenses/gpl-2.0.html>
+#
+# Copyright (c) 2002-2018 Bert Hubert <ahu@ds9a.nl>,
+#         Jacco Geul <jacco@geul.net>, Simon Séhier <simon@sehier.fr>
+#
+# See the ChangeLog for information on the individual contributions of the authors.
 
 QUANTUM=1500
-BURST=6k
+BURST=15k
 COMMONOPTIONS="$COMMONOPTIONS"
-VERSION=1.0
+VERSION=1.4
 
 usage()
 {
@@ -17,18 +26,18 @@ OPTIONS:
    -a <adapter> Set the adpter
    -d <rate>    Set maximum download rate (in Kbps) and/or
    -u <rate>    Set maximum upload rate (in Kbps)
-   -p           Use presets in /etc/conf.d/PS4shape.conf
+   -p           Use presets in /etc/conf.d/wondershaper.conf
    -c           Clear the limits from adapter
    -s           Show the current status of adapter
    -v           Show the current version
 MODES:
-   PS4shape -a <adapter> -d <rate> -u <rate>
-   PS4shape -c -a <adapter>
-   PS4shape -s -a <adapter>
+   wondershaper -a <adapter> -d <rate> -u <rate>
+   wondershaper -c -a <adapter>
+   wondershaper -s -a <adapter>
 EXAMPLES:
-   PS4shape -a eth0 -d 1024 -u 512
-   PS4shape -a eth0 -u 512
-   PS4shape -c -a eth0
+   wondershaper -a eth0 -d 1024 -u 512
+   wondershaper -a eth0 -u 512
+   wondershaper -c -a eth0
 EOF
 }
 
@@ -39,8 +48,8 @@ IFB="ifb0"
 IFB1="ifb1"
 MODE=
 LANFACE="eth0"
-LANMASK="10.42.0.0/24"
-LANSPEED="95000kbit"
+LANMASK="192.168.2.0/24"
+LANSPEED="85mbit"
 
 while getopts hvd:u:a:pcs o
 do	case "$o" in
@@ -61,11 +70,11 @@ done
 
 if [ "$MODE" = "presets" ]
 then
-    if [ -f /etc/conf.d/PS4shape.conf ]
+    if [ -f /etc/conf.d/wondershaper.conf ]
     then
-	source /etc/conf.d/PS4shape.conf
+	source /etc/conf.d/wondershaper.conf
     else
-	echo "/etc/conf.d/PS4shape.conf not found"
+	echo "/etc/conf.d/wondershaper.conf not found"
 	exit 1
     fi
 fi
@@ -80,10 +89,8 @@ fi
 
 if [ "$MODE" = "status" ]
 then
+    tc -s qdisc ls dev $IFACE
     tc -s class ls dev $IFACE
-    tc -s class ls dev $LANFACE
-    ifconfig $IFB
-    ifconfig $IFB1
     exit
 fi
 
@@ -91,14 +98,14 @@ if [ "$MODE" = "clear" ]
 then
     tc qdisc del dev $IFACE root    2> /dev/null > /dev/null
     tc qdisc del dev $IFACE ingress 2> /dev/null > /dev/null
+    tc qdisc del dev $LANFACE root    2> /dev/null > /dev/null
+    tc qdisc del dev $LANFACE ingress 2> /dev/null > /dev/null
     tc qdisc del dev $IFB   root    2> /dev/null > /dev/null
     tc qdisc del dev $IFB   ingress 2> /dev/null > /dev/null
-    tc qdisc del dev $LANFACE root 2> /dev/null
-    tc qdisc del dev $LANFACE ingress 2> /dev/null
     tc qdisc del dev $IFB1   root    2> /dev/null > /dev/null
-    tc qdisc del dev $IFB1   ingress 2> /dev/null > /dev
-    ip link set dev $IFB down
-    ip link set dev $IFB1 down
+    tc qdisc del dev $IFB1   ingress 2> /dev/null > /dev/null
+    ifconfig ifb0 down
+    ifconfig ifb1 down
     exit
 fi
 
@@ -108,91 +115,45 @@ then
     exit 1
 fi
 
-#Interactive Port PS4
-INTERACTIVE_PORT=3074
-
-# LOW PRIORITY BY PORT and IP. SRC=PORT OUT DEST=PORT IN.
-# LOW priority source netmasks
+# low priority OUTGOING traffic - you can leave this blank if you want
+# low priority source netmasks
 NOPRIOHOSTSRC=
 
-# LOW priority destination netmasks
+# low priority destination netmasks
 NOPRIOHOSTDST=
 
-# LOW priority source ports
-NOPRIOPORTSRC="22 33001 7777 8134"
+# low priority source ports
+NOPRIOPORTSRC=
 
-# LOW priority destination ports
-NOPRIOPORTDST="22 33001 7777 8134"
+# low priority destination ports
+NOPRIOPORTDST=
 
 # HIGH priority destination ports for PS4
-HIPRIOPORTDST="2001 3075 7500 7501 7502 7503 7504 7505 7506 7507 7508 7509 28608 30000 30001 30002 30003 30004 30005 30006 30007 30008 30009"
+HIPRIOPORTDST="1935 2001 3470 3471 3472 3473 3478 3479 3480 7500 7501 7502 7503 7504 7505 7506 7507 7508 7509 30000 30001 30002 30003 30004 30005 30006 30007 30008 30009"
+# HIGH priority destination ports for PS4
+HIPRIOPORTSRC="1935 2001 3470 3471 3472 3473 3478 3479 3480 7500 7501 7502 7503 7504 7505 7506 7507 7508 7509 30000 30001 30002 30003 30004 30005 30006 30007 30008 30009"
 
-# HIGH priority source ports for PS4
-HIPRIOPORTSRC="2001 3075 7500 7501 7502 7503 7504 7505 7506 7507 7508 7509 28608 30000 30001 30002 30003 30004 30005 30006 30007 30008 30009"
+###### uplink
 
-###### UPLINK SHAPING
+# install root HTB
 
-# ROOT DEFAULT HTB'S
-# WAN ROOT
 tc qdisc add dev $IFACE root handle 1: htb \
     default 20
-    
- # LAN ROOT
+
 tc qdisc add dev $LANFACE root handle 2: htb \
-    default 10
-########    
-# LAN CLASSES
+  default 10
 
- tc class add dev $LANFACE parent 2: classid 2:1 htb \
-        rate 100mbit \
-        prio 3 $COMMONOPTIONS
+tc class add dev $LANFACE parent 2: classid 2:1 htb \
+        rate $LANSPEED \
+        prio 5 $COMMONOPTIONS
 
- tc class add dev $LANFACE parent 2:1 classid 2:10 htb \
-        rate 60mbit ceil 95mbit \
-        prio 1 $COMMONOPTIONS
- 
- tc class add dev $LANFACE parent 2:1 classid 2:20 htb \
-        rate 40mbit ceil 90mbit \
-        prio 2 $COMMONOPTIONS
-#######
+tc class add dev $LANFACE parent 2: classid 2:10 htb rate 50mbit ceil 100mbit $COMMONOPTIONS 
+tc class add dev $LANFACE parent 2: classid 2:20 htb rate 35mbit ceil 70mbit $COMMONOPTIONS
+tc class add dev $LANFACE parent 2: classid 2:30 htb rate 15mbit ceil 30mbit $COMMONOPTIONS
 
- # LAN FILTERS
- 
- # TOS 1:10:
-    tc filter add dev $LANFACE parent 2: protocol ip prio 5 u32 \
-     match ip tos 0x10 0xff  flowid 2:10
- # ICMP 1:10:    
-    tc filter add dev $LANFACE parent 2: protocol ip prio 5 u32 \
-        match ip protocol 1 0xff flowid 2:10
-   # PACKETS <64 bytes 1:10:
-    tc filter add dev $LANFACE parent 2: protocol ip prio 5 u32 \
-        match ip protocol 6 0xff \
-        match u8 0x05 0x0f at 0 \
-        match u16 0x0000 0xffc0 at 2 \
-        flowid 2:10
- 
- #LAN INTERACTIVE PORT
- tc filter add dev $LANFACE protocol ip parent 2: prio 6 u32 match ip sport $INTERACTIVE_PORT 0xffff flowid 2:10
- tc filter add dev $LANFACE protocol ip parent 2: prio 6 u32 match ip dport $INTERACTIVE_PORT 0xffff flowid 2:10
- 
- # LAN TRAFFICE TO PS4 IP HIGH PRIORITY
- tc filter add dev $LANFACE parent 2: protocol ip prio 7 u32 match ip dst 10.42.0.201/32 flowid 2:10
- tc filter add dev $LANFACE parent 2: protocol ip prio 7 u32 match ip src 10.42.0.201/32 flowid 2:10
- 
- # LAN TRAFFIC TO REST OF LAN
- tc filter add dev $LANFACE parent 2: protocol ip prio 10 u32 match ip dst 10.42.0.0/25 flowid 2:20
- tc filter add dev $LANFACE parent 2: protocol ip prio 10 u32 match ip src 10.42.0.0/25 flowid 2:20
- 
- #######
- #LAN SFQ
-
- tc qdisc add dev $LANFACE parent 2:10 handle 10: sfq perturb 10 quantum $QUANTUM
- tc qdisc add dev $LANFACE parent 2:20 handle 20: sfq perturb 10 quantum $QUANTUM
-#######
-
-# WAN CLASSES
-# 1:10 1:20 1:30 CLASS UPLINKS
-
+# shape everything at $USPEED speed - this prevents huge queues in your
+# DSL modem which destroy latency:
+# main class
 if [[ ! -z $USPEED ]]
 then
 
@@ -200,115 +161,114 @@ then
         rate ${USPEED}kbit \
         prio 5 $COMMONOPTIONS
 
-    # High class 1:10:
+    # high prio class 1:10:
 
     tc class add dev $IFACE parent 1:1 classid 1:10 htb \
-        rate $((38*$USPEED/100))kbit ceil $((95*$USPEED/100))kbit \
+        rate $[40*$USPEED/100]kbit ceil $[95*$USPEED/100]kbit \
         prio 1 $COMMONOPTIONS
 
-    # Meduium class 1:20 
+    # bulk and default class 1:20 - gets slightly less traffic,
+    #  and a lower priority:
 
     tc class add dev $IFACE parent 1:1 classid 1:20 htb \
-        rate $((33*$USPEED/100))kbit ceil $((93*$USPEED/100))kbit \
+        rate $[35*$USPEED/100]kbit ceil $[95*$USPEED/100]kbit \
         prio 2 $COMMONOPTIONS
 
-    # Low class 1:30
+    # 'traffic we hate'
 
     tc class add dev $IFACE parent 1:1 classid 1:30 htb \
-        rate $((29*$USPEED/100))kbit ceil $((91*$USPEED/100))kbit \
+        rate $[25*$USPEED/100]kbit ceil $[90*$USPEED/100]kbit \
         prio 3 $COMMONOPTIONS
 
-    # SFQ:
+    # all get Stochastic Fairness:
     tc qdisc add dev $IFACE parent 1:10 handle 10: sfq perturb 10 quantum $QUANTUM
     tc qdisc add dev $IFACE parent 1:20 handle 20: sfq perturb 10 quantum $QUANTUM
     tc qdisc add dev $IFACE parent 1:30 handle 30: sfq perturb 10 quantum $QUANTUM
+    tc qdisc add dev $LANFACE parent 2:10 handle 10: sfq perturb 10 quantum $QUANTUM
+    tc qdisc add dev $LANFACE parent 2:20 handle 20: sfq perturb 10 quantum $QUANTUM
+    tc qdisc add dev $LANFACE parent 2:30 handle 30: sfq perturb 10 quantum $QUANTUM
 
-    # FILTERS
-
-    # TOS 1:10:
+    # start filters
+    # TOS Minimum Delay (ssh, NOT scp) in 1:10:
     tc filter add dev $IFACE parent 1: protocol ip prio 10 u32 \
         match ip tos 0x10 0xff  flowid 1:10
 
-    # ICMP 1:10:    
+    # ICMP (ip protocol 1) in the interactive class 1:10 so we
+    # can do measurements & impress our friends:
     tc filter add dev $IFACE parent 1: protocol ip prio 11 u32 \
         match ip protocol 1 0xff flowid 1:10
 
-    # PACKETS <64 bytes 1:10:
+    # prioritize small packets (<64 bytes)
+
     tc filter add dev $IFACE parent 1: protocol ip prio 12 u32 \
         match ip protocol 6 0xff \
         match u8 0x05 0x0f at 0 \
         match u16 0x0000 0xffc0 at 2 \
         flowid 1:10
-	
-    # PORTS Hi and Low priority ports
-    # Interactive Port
 
-    for a in $INTERACTIVE_PORT
+    # PS4 destination ports.
+
+    for a in $HIPRIOPORTDST
     do
         tc filter add dev $IFACE parent 1: protocol ip prio 13 u32 \
             match ip dport $a 0xffff flowid 1:20
     done
-    
-    for b in $INTERACTIVE_PORT
+    #PS4 source ports.
+
+    for a in $HIPRIOPORTSRC
     do
         tc filter add dev $IFACE parent 1: protocol ip prio 14 u32 \
-            match ip sport $b 0xffff flowid 1:20
-    done	
-
-    # PS4 destination ports.
-
-    for c in $HIPRIOPORTDST
-    do
-        tc filter add dev $IFACE parent 1: protocol ip prio 15 u32 \
-            match ip dport $c 0xffff flowid 1:20
-    done
-    # PS4 source ports.
-
-    for d in $HIPRIOPORTSRC
-    do
-        tc filter add dev $IFACE parent 1: protocol ip prio 16 u32 \
-            match ip sport $d 0xffff flowid 1:20
+            match ip sport $a 0xffff flowid 1:20
     done
 
-    # BULK PRIORITY 1:30 (REST OF TRAFFIC)
+    # Bulk traffic at medium priority.
 
-    tc filter add dev $IFACE parent 1: protocol ip prio 18 u32 \
-        match ip dst 0.0.0.0/0 flowid 1:30
+    tc filter add dev $IFACE parent 1: protocol ip prio 16 u32 \
+        match ip dst 0.0.0.0/0 flowid 1:20
+
+    tc filter add dev $LANFACE parent 2: protocol ip prio 5 u32 \
+        match ip dst 0.0.0.0/0 flowid 2:10
 
 
-    # LOWER PRIORITY FILTERS
-    for e in $NOPRIOPORTDST
+    # some traffic however suffers a worse fate
+    for a in $NOPRIOPORTDST
+    do
+        tc filter add dev $IFACE parent 1: protocol ip prio 18 u32 \
+            match ip dport $a 0xffff flowid 1:30
+    done
+
+    for a in $NOPRIOPORTSRC
+    do
+        tc filter add dev $IFACE parent 1: protocol ip prio 19 u32 \
+            match ip sport $a 0xffff flowid 1:30
+    done
+
+    for a in $NOPRIOHOSTSRC
     do
         tc filter add dev $IFACE parent 1: protocol ip prio 20 u32 \
-            match ip dport $e 0xffff flowid 1:30
+            match ip src $a flowid 1:30
     done
 
-    for f in $NOPRIOPORTSRC
+    for a in $NOPRIOHOSTDST
     do
         tc filter add dev $IFACE parent 1: protocol ip prio 21 u32 \
-            match ip sport $f 0xffff flowid 1:30
+            match ip dst $a flowid 1:30
     done
 
-    for g in $NOPRIOHOSTSRC
-    do
-        tc filter add dev $IFACE parent 1: protocol ip prio 22 u32 \
-            match ip src $g flowid 1:30
-    done
-
-    for h in $NOPRIOHOSTDST
-    do
-        tc filter add dev $IFACE parent 1: protocol ip prio 23 u32 \
-            match ip dst $h flowid 1:30
-    done
+    
+    
 fi
 
-# DOWNLINK SHAPING WITH IFB INGRESS/EGRESS
-
-# INGRESS POLICER
+########## downlink #############
+# slow downloads down to somewhat less than the real speed  to prevent
+# queuing at our ISP. Tune to see how high you can set it.
+# ISPs tend to have *huge* queues to make sure big downloads are fast
+#
+# attach ingress policer:
 if [[ ! -z $DSPEED ]]
 then
 
-    # ADD the IFB interface
+    # Add the IFB interface
     modprobe ifb
     ip link set dev $IFB up
     ip link set dev $IFB1 up
@@ -316,26 +276,24 @@ then
     ip link set dev $IFB1 txqueuelen 32
     ip link set mtu 1500 dev $IFB
     ip link set mtu 1500 dev $IFB1
-    
-    
-    # Redirect  WAN ingress (incoming) to egress ifb0
+
+    # Redirect ingress (incoming) to egress ifb0
     tc qdisc add dev $IFACE handle ffff: ingress
-    tc filter add dev $IFACE parent ffff: protocol ip u32 match u32 0 0 \
-        action mirred egress redirect dev $IFB
-	
-    # Redirect LAN ingress (incoming) to egress eth10
     tc qdisc add dev $LANFACE handle ffff: ingress
+
+    tc filter add dev $IFACE parent ffff: protocol ip u32 match u32 0 0 \
+        action mirred egress redirect dev ifb0
     tc filter add dev $LANFACE parent ffff: protocol ip u32 match u32 0 0 \
-        action mirred egress redirect dev $IFB1
+        action mirred egress redirect dev ifb1
     
     # Add class and rules for virtual
     tc qdisc add dev $IFB root handle 3: htb
     tc qdisc add dev $IFB1 root handle 4: htb
+
     tc class add dev $IFB parent 3: classid 3:1 htb rate ${DSPEED}kbit 
     tc class add dev $IFB1 parent 4: classid 4:1 htb rate $LANSPEED
     
     # Add filter to rule for IP address
     tc filter add dev $IFB protocol ip parent 3: prio 1 u32 match ip src 0.0.0.0/0 flowid 3:1
-    tc filter add dev $IFB1 protocol ip parent 4: prio 1 u32 match ip dst 10.42.0.201/32 flowid 4:1
-    tc filter add dev $IFB1 protocol ip parent 4: prio 10 u32 match ip dst 10.42.0.0/25 flowid 4:1
+    tc filter add dev $IFB1 protocol ip parent 4: prio 1 u32 match ip src $LANMASK flowid 4:1
 fi
