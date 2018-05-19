@@ -288,12 +288,8 @@ then
     
 fi
 
-########## downlink #############
-# slow downloads down to somewhat less than the real speed  to prevent
-# queuing at our ISP. Tune to see how high you can set it.
-# ISPs tend to have *huge* queues to make sure big downloads are fast
-#
-# attach ingress policer:
+# Download and destination WAN and LAN
+# Ingress policer:
 if [[ ! -z $DSPEED ]]
 then
 
@@ -306,16 +302,17 @@ then
     ip link set mtu 1500 dev $IFB
     ip link set mtu 1500 dev $IFB1
 
-    # Redirect ingress (incoming) to egress ifb0
+    # Redirect  WAN and LAN to ifb0 and ifb1
     tc qdisc add dev $IFACE handle ffff: ingress
     tc qdisc add dev $LANFACE handle ffff: ingress
 
-    tc filter add dev $IFACE parent ffff: protocol ip u32 match u32 0 0 \
+   # Mirred egress (now upload rules) to ifb# interfaces
+   tc filter add dev $IFACE parent ffff: protocol ip u32 match u32 0 0 \
         action mirred egress redirect dev ifb0
     tc filter add dev $LANFACE parent ffff: protocol ip u32 match u32 0 0 \
         action mirred egress redirect dev ifb1
     
-    # Add class and rules for WAN and LAN IFB interfaces
+    # Add  root, class and rules for WAN and LAN IFB interfaces
     tc qdisc add dev $IFB root handle 3: htb
     tc qdisc add dev $IFB1 root handle 4: htb
 
