@@ -209,7 +209,7 @@ then
     tc filter add dev $IFACE parent 1: protocol ip prio 10 u32 \
         match ip protocol 1 0xff flowid 1:10
 	
-    tc filter add dev $LANFACE parent 1: protocol ip prio 101 u32 \
+    tc filter add dev $LANFACE parent 1: protocol ip prio 10 u32 \
         match ip protocol 1 0xff flowid 2:10
 
     # SMALL PACKETS (<64 bytes)
