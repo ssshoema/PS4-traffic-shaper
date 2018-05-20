@@ -187,7 +187,7 @@ then
     
     for b in $INTERACTIVE_PORT
     do
-        tc filter add dev $IFACE parent 1: protocol ip prio 14 u32 \
+        tc filter add dev $IFACE parent 1: protocol ip prio 13 u32 \
             match ip sport $b 0xffff flowid 1:20
     done	
 
