@@ -120,24 +120,27 @@ then
     exit 1
 fi
 
-# LOW priority OUTGOING traffic
-# NETMASKS source
+#Interactive Port PS4
+INTERACTIVE_PORT=3074
+
+# LOW PRIORITY BY PORT and IP. SRC=PORT OUT DEST=PORT IN.
+# LOW priority source netmasks
 NOPRIOHOSTSRC=
 
-# NETMASKS destination
+# LOW priority destination netmasks
 NOPRIOHOSTDST=
 
-# SOURCE ports
-NOPRIOPORTSRC=
+# LOW priority source ports
+NOPRIOPORTSRC="22 33001 7777 8134"
 
-# DESTINATION ports
-NOPRIOPORTDST=
+# LOW priority destination ports
+NOPRIOPORTDST="22 33001 7777 8134"
 
-# Derived from PSN, Bungie, and IPTRAF logs -
-# HIGH priority DESTINATION ports for PS4
-HIPRIOPORTDST="1935 2001 3470 3471 3472 3473 3478 3479 3480 7500 7501 7502 7503 7504 7505 7506 7507 7508 7509 30000 30001 30002 30003 30004 30005 30006 30007 30008 30009"
-# HIGH priority SOURCE ports for PS4
-HIPRIOPORTSRC="1935 2001 3470 3471 3472 3473 3478 3479 3480 7500 7501 7502 7503 7504 7505 7506 7507 7508 7509 30000 30001 30002 30003 30004 30005 30006 30007 30008 30009"
+# HIGH priority destination ports for PS4
+HIPRIOPORTDST="2001 3075 7500 7501 7502 7503 7504 7505 7506 7507 7508 7509 28608 30000 30001 30002 30003 30004 30005 30006 30007 30008 30009"
+
+# HIGH priority source ports for PS4
+HIPRIOPORTSRC="2001 3075 7500 7501 7502 7503 7504 7505 7506 7507 7508 7509 28608 30000 30001 30002 30003 30004 30005 30006 30007 30008 30009"
 
 ###### UPLINK/UPLOAD shaping.
 
@@ -223,6 +226,18 @@ then
         flowid 2:10
 
     # PS4 destination ports filters WAN and LAN
+    for a in $INTERACTIVE_PORT
+    do
+        tc filter add dev $IFACE parent 1: protocol ip prio 12 u32 \
+            match ip dport $a 0xffff flowid 1:20
+    done
+    
+    for b in $INTERACTIVE_PORT
+    do
+        tc filter add dev $IFACE parent 1: protocol ip prio 12 u32 \
+            match ip sport $b 0xffff flowid 1:20
+    done	
+    
     for a in $HIPRIOPORTDST
     do
         tc filter add dev $IFACE parent 1: protocol ip prio 13 u32 \
