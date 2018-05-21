@@ -1,15 +1,10 @@
 #!/bin/bash
-# Wonder Shaper
 #
 # Set the following values to somewhat less than your actual download
 # and uplink speed. In kilobits. Also set the device that is to be shaped.
 #
 # License GPLv2 <https://gnu.org/licenses/gpl-2.0.html>
-#
-# Copyright (c) 2002-2018 Bert Hubert <ahu@ds9a.nl>,
-#         Jacco Geul <jacco@geul.net>, Simon Séhier <simon@sehier.fr>
-#
-# See the ChangeLog for information on the individual contributions of the authors.
+
 
 QUANTUM=1500
 BURST=15k
@@ -31,13 +26,13 @@ OPTIONS:
    -s           Show the current status of adapter
    -v           Show the current version
 MODES:
-   wondershaper -a <adapter> -d <rate> -u <rate>
-   wondershaper -c -a <adapter>
-   wondershaper -s -a <adapter>
+   PS4wanlanshape -a <adapter> -d <rate> -u <rate>
+   PS4wanlanshape -c -a <adapter>
+   PS4wanlanshape -s -a <adapter>
 EXAMPLES:
-   wondershaper -a eth0 -d 1024 -u 512
-   wondershaper -a eth0 -u 512
-   wondershaper -c -a eth0
+   PS4wanlanshape -a eth0 -d 1024 -u 512
+   PS4wanlanshape -a eth0 -u 512
+   PS4wanlanshape -c -a eth0
 EOF
 }
 
@@ -70,11 +65,11 @@ done
 
 if [ "$MODE" = "presets" ]
 then
-    if [ -f /etc/conf.d/wondershaper.conf ]
+    if [ -f /etc/conf.d/PS4wanlanshape.conf ]
     then
-	source /etc/conf.d/wondershaper.conf
+	source /etc/conf.d/PS4wanlanshape.conf
     else
-	echo "/etc/conf.d/wondershaper.conf not found"
+	echo "/etc/conf.d/PS4wanlanshape.conf not found"
 	exit 1
     fi
 fi
@@ -115,18 +110,18 @@ then
     exit 1
 fi
 
-# low priority OUTGOING traffic - you can leave this blank if you want
-# low priority source netmasks
+# OUTGOING traffic
+# LOW priority source netmasks
 NOPRIOHOSTSRC=
 
-# low priority destination netmasks
+# LOW priority destination netmasks
 NOPRIOHOSTDST=
 
-# low priority source ports
-NOPRIOPORTSRC=
+# LOW priority source ports
+NOPRIOPORTSRC="22 33001 7777 8134"
 
-# low priority destination ports
-NOPRIOPORTDST=
+# LOW priority destination ports
+NOPRIOPORTDST="22 33001 7777 8134"
 
 # HIGH priority destination ports for PS4
 HIPRIOPORTDST="2001 3074 3075 7500 7501 7502 7503 7504 7505 7506 7507 7508 7509 28608 30000 30001 30002 30003 30004 30005 30006 30007 30008 30009"
@@ -152,9 +147,7 @@ tc class add dev $LANFACE parent 2: classid 2:10 htb rate 50mbit ceil 100mbit $C
 tc class add dev $LANFACE parent 2: classid 2:20 htb rate 35mbit ceil 70mbit $COMMONOPTIONS
 tc class add dev $LANFACE parent 2: classid 2:30 htb rate 15mbit ceil 30mbit $COMMONOPTIONS
 
-# shape everything at $USPEED speed - this prevents huge queues in your
-# DSL modem which destroy latency:
-# main class
+# MAIN CLASS
 if [[ ! -z $USPEED ]]
 then
 
@@ -162,26 +155,25 @@ then
         rate ${USPEED}kbit \
         prio 5 $COMMONOPTIONS
 
-    # high prio class 1:10:
+    # HIGH 1:10:
 
     tc class add dev $IFACE parent 1:1 classid 1:10 htb \
         rate $[40*$USPEED/100]kbit ceil $[95*$USPEED/100]kbit \
         prio 1 $COMMONOPTIONS
 
-    # bulk and default class 1:20 - gets slightly less traffic,
-    #  and a lower priority:
+    # MEDIUM 1:20
 
     tc class add dev $IFACE parent 1:1 classid 1:20 htb \
         rate $[35*$USPEED/100]kbit ceil $[95*$USPEED/100]kbit \
         prio 2 $COMMONOPTIONS
 
-    # 'traffic we hate'
+    # LOW 1:30
 
     tc class add dev $IFACE parent 1:1 classid 1:30 htb \
         rate $[25*$USPEED/100]kbit ceil $[90*$USPEED/100]kbit \
         prio 3 $COMMONOPTIONS
 
-    # all get Stochastic Fairness:
+    # SFQ
     tc qdisc add dev $IFACE parent 1:10 handle 10: sfq perturb 10 quantum $QUANTUM
     tc qdisc add dev $IFACE parent 1:20 handle 20: sfq perturb 10 quantum $QUANTUM
     tc qdisc add dev $IFACE parent 1:30 handle 30: sfq perturb 10 quantum $QUANTUM
@@ -189,17 +181,16 @@ then
     tc qdisc add dev $LANFACE parent 2:20 handle 20: sfq perturb 10 quantum $QUANTUM
     tc qdisc add dev $LANFACE parent 2:30 handle 30: sfq perturb 10 quantum $QUANTUM
 
-    # start filters
-    # TOS Minimum Delay (ssh, NOT scp) in 1:10:
+    # FILTERS
+    # TOS 
     tc filter add dev $IFACE parent 1: protocol ip prio 10 u32 \
         match ip tos 0x10 0xff  flowid 1:10
 
-    # ICMP (ip protocol 1) in the interactive class 1:10 so we
-    # can do measurements & impress our friends:
+    # ICMP 
     tc filter add dev $IFACE parent 1: protocol ip prio 11 u32 \
         match ip protocol 1 0xff flowid 1:10
 
-    # prioritize small packets (<64 bytes)
+    # PACKETS (<64 bytes)
 
     tc filter add dev $IFACE parent 1: protocol ip prio 12 u32 \
         match ip protocol 6 0xff \
@@ -222,7 +213,7 @@ then
             match ip sport $a 0xffff flowid 1:20
     done
 
-    # Bulk traffic at medium priority.
+    # REST of traffic MEDIUM
 
     tc filter add dev $IFACE parent 1: protocol ip prio 16 u32 \
         match ip dst 0.0.0.0/0 flowid 1:20
@@ -231,7 +222,8 @@ then
         match ip dst 0.0.0.0/0 flowid 2:10
 
 
-    # some traffic however suffers a worse fate
+    # LOW priority traffic.
+    
     for a in $NOPRIOPORTDST
     do
         tc filter add dev $IFACE parent 1: protocol ip prio 18 u32 \
@@ -255,17 +247,10 @@ then
         tc filter add dev $IFACE parent 1: protocol ip prio 21 u32 \
             match ip dst $a flowid 1:30
     done
-
-    
-    
 fi
 
-########## downlink #############
-# slow downloads down to somewhat less than the real speed  to prevent
-# queuing at our ISP. Tune to see how high you can set it.
-# ISPs tend to have *huge* queues to make sure big downloads are fast
-#
-# attach ingress policer:
+# DOWLINK LAN/WAN
+
 if [[ ! -z $DSPEED ]]
 then
 
@@ -278,7 +263,7 @@ then
     ip link set mtu 1500 dev $IFB
     ip link set mtu 1500 dev $IFB1
 
-    # Redirect ingress (incoming) to egress ifb0
+    # Ingress to egress ifb0 and ifb1
     tc qdisc add dev $IFACE handle ffff: ingress
     tc qdisc add dev $LANFACE handle ffff: ingress
 
@@ -287,14 +272,14 @@ then
     tc filter add dev $LANFACE parent ffff: protocol ip u32 match u32 0 0 \
         action mirred egress redirect dev ifb1
     
-    # Add class and rules for virtual
+    # ARoot class
     tc qdisc add dev $IFB root handle 3: htb
     tc qdisc add dev $IFB1 root handle 4: htb
 
     tc class add dev $IFB parent 3: classid 3:1 htb rate ${DSPEED}kbit 
     tc class add dev $IFB1 parent 4: classid 4:1 htb rate $LANSPEED
     
-    # Add filter to rule for IP address
+    # Filters
     tc filter add dev $IFB protocol ip parent 3: prio 1 u32 match ip src 0.0.0.0/0 flowid 3:1
     tc filter add dev $IFB1 protocol ip parent 4: prio 1 u32 match ip src $LANMASK flowid 4:1
 fi
