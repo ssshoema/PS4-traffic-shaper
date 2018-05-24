@@ -207,7 +207,7 @@ then
         tc filter add dev $IFACE parent 1: protocol ip prio 13 u32 \
             match ip dport $a 0xffff flowid 1:20
 	tc filter add dev $IFACE parent 1: protocol ip prio 13 u32 \
-            match ip sport $b 0xffff flowid 1:20
+            match ip sport $a 0xffff flowid 1:20
     done
     
     for b in $INTERACTIVE_PORT LAN
@@ -260,13 +260,13 @@ then
     for g in $NOPRIOHOSTSRC
     do
         tc filter add dev $IFACE parent 1: protocol ip prio 20 u32 \
-            match ip src $a flowid 1:30
+            match ip src $g flowid 1:30
     done
 
-    for a in $NOPRIOHOSTDST
+    for h in $NOPRIOHOSTDST
     do
         tc filter add dev $IFACE parent 1: protocol ip prio 21 u32 \
-            match ip dst $g flowid 1:30
+            match ip dst $h flowid 1:30
     done
 fi
 
