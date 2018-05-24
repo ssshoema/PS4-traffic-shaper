@@ -151,7 +151,7 @@ then
     # Low class 1:30
 
     tc class add dev $IFACE parent 1:1 classid 1:30 htb \
-        rate $[27*$USPEED/100]kbit ceil $[91*$USPEED/100]kbit \
+        rate $[27*$USPEED/100]kbit ceil $[92*$USPEED/100]kbit \
         prio 3 $COMMONOPTIONS
 
     # SFQ:
