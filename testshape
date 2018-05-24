@@ -169,25 +169,31 @@ then
     tc filter add dev $IFACE parent 1: protocol ip prio 9 u32 \
         match ip protocol 1 0xff flowid 1:10
 
-    # PACKETS <64 bytes 1:10:
+    # PACKETS < 128 bytes 1:10:
     tc filter add dev $IFACE parent 1: protocol ip prio 10 u32 \
         match ip protocol 6 0xff \
         match u8 0x05 0x0f at 0 \
-        match u16 0x0000 0xffc0 at 2 \
+        match u16 0x0000 0xff80 at 2 \
         flowid 1:10
+	
+     # UDP Traffic
+     tc filter add dev $IFACE parent 1: protocol ip prio 11 u32 \
+     match ip protocol 17 0xff \
+     flowid 1:10
+     
 	
     # PORTS Hi and Low priority ports
     # Interactive Port
 
     for a in $INTERACTIVE_PORT
     do
-        tc filter add dev $IFACE parent 1: protocol ip prio 11 u32 \
+        tc filter add dev $IFACE parent 1: protocol ip prio 12 u32 \
             match ip dport $a 0xffff flowid 1:20
     done
     
     for b in $INTERACTIVE_PORT
     do
-        tc filter add dev $IFACE parent 1: protocol ip prio 11 u32 \
+        tc filter add dev $IFACE parent 1: protocol ip prio 12 u32 \
             match ip sport $b 0xffff flowid 1:20
     done	
 
@@ -195,14 +201,14 @@ then
 
     for c in $HIPRIOPORTDST
     do
-        tc filter add dev $IFACE parent 1: protocol ip prio 12 u32 \
+        tc filter add dev $IFACE parent 1: protocol ip prio 13 u32 \
             match ip dport $c 0xffff flowid 1:20
     done
     # PS4 source ports.
 
     for d in $HIPRIOPORTSRC
     do
-        tc filter add dev $IFACE parent 1: protocol ip prio 12 u32 \
+        tc filter add dev $IFACE parent 1: protocol ip prio 13 u32 \
             match ip sport $d 0xffff flowid 1:20
     done
 
