@@ -3,7 +3,7 @@
 # See README for details.
 
 QUANTUM=1500
-BURST=6k
+BURST=15k
 COMMONOPTIONS="$COMMONOPTIONS"
 VERSION=1.0
 
@@ -139,7 +139,7 @@ then
     # High class 1:10:
 
     tc class add dev $IFACE parent 1:1 classid 1:10 htb \
-        rate $[38*$USPEED/100]kbit ceil $[95*$USPEED/100]kbit \
+        rate $[40*$USPEED/100]kbit ceil $[95*$USPEED/100]kbit \
         prio 1 $COMMONOPTIONS
 
     # Meduium class 1:20 
@@ -151,7 +151,7 @@ then
     # Low class 1:30
 
     tc class add dev $IFACE parent 1:1 classid 1:30 htb \
-        rate $[29*$USPEED/100]kbit ceil $[91*$USPEED/100]kbit \
+        rate $[27*$USPEED/100]kbit ceil $[91*$USPEED/100]kbit \
         prio 3 $COMMONOPTIONS
 
     # SFQ:
@@ -162,15 +162,15 @@ then
     # FILTERS
 
     # TOS 1:10:
-    tc filter add dev $IFACE parent 1: protocol ip prio 10 u32 \
+    tc filter add dev $IFACE parent 1: protocol ip prio 8 u32 \
         match ip tos 0x10 0xff  flowid 1:10
 
     # ICMP 1:10:    
-    tc filter add dev $IFACE parent 1: protocol ip prio 11 u32 \
+    tc filter add dev $IFACE parent 1: protocol ip prio 9 u32 \
         match ip protocol 1 0xff flowid 1:10
 
     # PACKETS <64 bytes 1:10:
-    tc filter add dev $IFACE parent 1: protocol ip prio 12 u32 \
+    tc filter add dev $IFACE parent 1: protocol ip prio 10 u32 \
         match ip protocol 6 0xff \
         match u8 0x05 0x0f at 0 \
         match u16 0x0000 0xffc0 at 2 \
@@ -181,13 +181,13 @@ then
 
     for a in $INTERACTIVE_PORT
     do
-        tc filter add dev $IFACE parent 1: protocol ip prio 13 u32 \
+        tc filter add dev $IFACE parent 1: protocol ip prio 11 u32 \
             match ip dport $a 0xffff flowid 1:20
     done
     
     for b in $INTERACTIVE_PORT
     do
-        tc filter add dev $IFACE parent 1: protocol ip prio 13 u32 \
+        tc filter add dev $IFACE parent 1: protocol ip prio 11 u32 \
             match ip sport $b 0xffff flowid 1:20
     done	
 
@@ -195,20 +195,20 @@ then
 
     for c in $HIPRIOPORTDST
     do
-        tc filter add dev $IFACE parent 1: protocol ip prio 15 u32 \
+        tc filter add dev $IFACE parent 1: protocol ip prio 12 u32 \
             match ip dport $c 0xffff flowid 1:20
     done
     # PS4 source ports.
 
     for d in $HIPRIOPORTSRC
     do
-        tc filter add dev $IFACE parent 1: protocol ip prio 15 u32 \
+        tc filter add dev $IFACE parent 1: protocol ip prio 12 u32 \
             match ip sport $d 0xffff flowid 1:20
     done
 
     # BULK PRIORITY 1:30 (REST OF TRAFFIC)
 
-    tc filter add dev $IFACE parent 1: protocol ip prio 18 u32 \
+    tc filter add dev $IFACE parent 1: protocol ip prio 15 u32 \
         match ip dst 0.0.0.0/0 flowid 1:30
 
 
@@ -260,7 +260,7 @@ then
     tc class add dev $IFB parent 2: classid 2:1 htb rate ${DSPEED}kbit 
     
     # Add filter to rule for IP address
-    tc filter add dev $IFB protocol ip parent 2: prio 1 u32 match ip src 0.0.0.0/0 flowid 2:1
+    tc filter add dev $IFB protocol ip parent 2: prio 1 u32 match ip src 0.0.0.0/0 burst $BURST drop flowid 2:1
 fi
 # Bufferbloat counter measures.
 sysctl -w net.ipv4.tcp_ecn=1
