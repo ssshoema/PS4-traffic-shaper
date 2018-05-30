@@ -6,7 +6,7 @@
 # License GPLv2 <https://gnu.org/licenses/gpl-2.0.html>
 
 QUANTUM=1500
-BURST=15k
+BURST=19k
 COMMONOPTIONS="$COMMONOPTIONS"
 VERSION=1.4
 
@@ -202,7 +202,7 @@ then
 
     # Interactive Port
 
-    for a in $INTERACTIVE_PORT WAN
+    for a in $INTERACTIVE_PORT
     do
         tc filter add dev $IFACE parent 1: protocol ip prio 13 u32 \
             match ip dport $a 0xffff flowid 1:20
@@ -210,12 +210,12 @@ then
             match ip sport $a 0xffff flowid 1:20
     done
     
-    for b in $INTERACTIVE_PORT LAN
+    for b in $INTERACTIVE_PORT
     do
-        tc filter add dev $LANFACE parent 1: protocol ip prio 14 u32 \
-            match ip dport $b 0xffff flowid 1:20
-	tc filter add dev $LANFACE parent 1: protocol ip prio 14 u32 \
-            match ip sport $b 0xffff flowid 1:20
+        tc filter add dev $LANFACE parent 2: protocol ip prio 14 u32 \
+            match ip dport $b 0xffff flowid 2:10
+	tc filter add dev $LANFACE parent 2: protocol ip prio 14 u32 \
+            match ip sport $b 0xffff flowid 2:10
     done
     
     # PS4 destination ports.
@@ -224,23 +224,27 @@ then
     do
         tc filter add dev $IFACE parent 1: protocol ip prio 15 u32 \
             match ip dport $c 0xffff flowid 1:20
+	tc filter add dev $LANFACE parent 2: protocol ip prio 15 u32 \
+            match ip dport $c 0xffff flowid 2:20
     done
     
     #PS4 source ports.
 
     for d in $HIPRIOPORTSRC
     do
-        tc filter add dev $IFACE parent 1: protocol ip prio 15 u32 \
+        tc filter add dev $IFACE parent 1: protocol ip prio 16 u32 \
             match ip sport $d 0xffff flowid 1:20
+	 tc filter add dev $LANFACE parent 2: protocol ip prio 16 u32 \
+            match ip sport $d 0xffff flowid 2:20
     done
 
     # REST of traffic MEDIUM
 
-    tc filter add dev $IFACE parent 1: protocol ip prio 16 u32 \
+    tc filter add dev $IFACE parent 1: protocol ip prio 17 u32 \
         match ip dst 0.0.0.0/0 flowid 1:20
 
     tc filter add dev $LANFACE parent 2: protocol ip prio 5 u32 \
-        match ip dst 0.0.0.0/0 flowid 2:10
+        match ip dst 0.0.0.0/0 flowid 2:20
 
 
     # LOW priority traffic.
