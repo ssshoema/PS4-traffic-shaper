@@ -6,7 +6,7 @@
 # License GPLv2 <https://gnu.org/licenses/gpl-2.0.html>
 
 QUANTUM=1500
-BURST=19k
+BURST=15k
 COMMONOPTIONS="$COMMONOPTIONS"
 VERSION=1.4
 
@@ -145,9 +145,9 @@ tc class add dev $LANFACE parent 2: classid 2:1 htb \
         rate $LANSPEED \
         prio 5 $COMMONOPTIONS
 
-tc class add dev $LANFACE parent 2: classid 2:10 htb rate 50mbit ceil 100mbit $COMMONOPTIONS 
-tc class add dev $LANFACE parent 2: classid 2:20 htb rate 35mbit ceil 70mbit $COMMONOPTIONS
-tc class add dev $LANFACE parent 2: classid 2:30 htb rate 15mbit ceil 30mbit $COMMONOPTIONS
+tc class add dev $LANFACE parent 2:1 classid 2:10 htb rate 50mbit ceil 95mbit $COMMONOPTIONS 
+tc class add dev $LANFACE parent 2:1 classid 2:20 htb rate 35mbit ceil 70mbit $COMMONOPTIONS
+tc class add dev $LANFACE parent 2:1 classid 2:30 htb rate 15mbit ceil 30mbit $COMMONOPTIONS
 
 # MAIN CLASS WAN
 if [[ ! -z $USPEED ]]
@@ -184,38 +184,44 @@ then
     tc qdisc add dev $LANFACE parent 2:30 handle 30: sfq perturb 10 quantum $QUANTUM
 
     # FILTERS
-    # TOS 
-    tc filter add dev $IFACE parent 1: protocol ip prio 10 u32 \
+    # TOS 1:10:
+    tc filter add dev $IFACE parent 1: protocol ip prio 7 u32 \
         match ip tos 0x10 0xff  flowid 1:10
 
-    # ICMP 
-    tc filter add dev $IFACE parent 1: protocol ip prio 11 u32 \
+    # ICMP 1:10:    
+    tc filter add dev $IFACE parent 1: protocol ip prio 8 u32 \
         match ip protocol 1 0xff flowid 1:10
 
-    # PACKETS (<64 bytes)
-
-    tc filter add dev $IFACE parent 1: protocol ip prio 12 u32 \
+    # PACKETS < 128 bytes 1:10:
+    tc filter add dev $IFACE parent 1: protocol ip prio 9 u32 \
         match ip protocol 6 0xff \
         match u8 0x05 0x0f at 0 \
-        match u16 0x0000 0xffc0 at 2 \
+        match u16 0x0000 0xff80 at 2 \
         flowid 1:10
+	
+     # UDP Traffic
+     tc filter add dev $IFACE parent 1: protocol ip prio 10 u32 \
+     match ip protocol 17 0xff \
+     flowid 1:10
 
     # Interactive Port
 
     for a in $INTERACTIVE_PORT
     do
-        tc filter add dev $IFACE parent 1: protocol ip prio 13 u32 \
+        tc filter add dev $IFACE parent 1: protocol ip prio 12 u32 \
             match ip dport $a 0xffff flowid 1:20
-	tc filter add dev $IFACE parent 1: protocol ip prio 13 u32 \
+        tc filter add dev $IFACE parent 1: protocol ip prio 12 u32 \
             match ip sport $a 0xffff flowid 1:20
+
     done
     
     for b in $INTERACTIVE_PORT
     do
-        tc filter add dev $LANFACE parent 2: protocol ip prio 14 u32 \
+        tc filter add dev $LANFACE parent 2: protocol ip prio 13 u32 \
             match ip dport $b 0xffff flowid 2:10
-	tc filter add dev $LANFACE parent 2: protocol ip prio 14 u32 \
+        tc filter add dev $LANFACE parent 2: protocol ip prio 13 u32 \
             match ip sport $b 0xffff flowid 2:10
+	
     done
     
     # PS4 destination ports.
@@ -224,7 +230,7 @@ then
     do
         tc filter add dev $IFACE parent 1: protocol ip prio 15 u32 \
             match ip dport $c 0xffff flowid 1:20
-	tc filter add dev $LANFACE parent 2: protocol ip prio 15 u32 \
+        tc filter add dev $LANFACE parent 2: protocol ip prio 15 u32 \
             match ip dport $c 0xffff flowid 2:20
     done
     
@@ -234,7 +240,7 @@ then
     do
         tc filter add dev $IFACE parent 1: protocol ip prio 16 u32 \
             match ip sport $d 0xffff flowid 1:20
-	 tc filter add dev $LANFACE parent 2: protocol ip prio 16 u32 \
+        tc filter add dev $LANFACE parent 2: protocol ip prio 16 u32 \
             match ip sport $d 0xffff flowid 2:20
     done
 
@@ -245,7 +251,6 @@ then
 
     tc filter add dev $LANFACE parent 2: protocol ip prio 5 u32 \
         match ip dst 0.0.0.0/0 flowid 2:20
-
 
     # LOW priority traffic.
     
@@ -296,8 +301,8 @@ then
         action mirred egress redirect dev ifb0
 	
     tc filter add dev $LANFACE parent ffff: protocol ip u32 match u32 0 0 \
-        action mirred egress redirect dev ifb1
-    
+        action mirred egress redirect dev ifb1 
+  
     # Root class
     tc qdisc add dev $IFB root handle 3: htb
     tc qdisc add dev $IFB1 root handle 4: htb
@@ -307,6 +312,8 @@ then
     
     # Filters
     tc filter add dev $IFB protocol ip parent 3: prio 1 u32 match ip src 0.0.0.0/0 flowid 3:1
-    tc filter add dev $IFB1 protocol ip parent 4: prio 1 u32 match ip src $LANMASK flowid 4:1
+    tc filter add dev $IFB1 protocol ip parent 4: prio 1 u32 match ip src 10.42.0.201/32 flowid 4:1
+    tc filter add dev $IFB1 protocol ip parent 4: prio 10 u32 match ip src $LANMASK flowid 4:1
+
 fi
 
