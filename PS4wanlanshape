@@ -160,19 +160,19 @@ then
     # HIGH 1:10:
 
     tc class add dev $IFACE parent 1:1 classid 1:10 htb \
-        rate $[38*$USPEED/100]kbit ceil $[95*$USPEED/100]kbit \
+        rate $[43*$USPEED/100]kbit ceil $[95*$USPEED/100]kbit \
         prio 1 $COMMONOPTIONS
 
     # MEDIUM 1:20
 
     tc class add dev $IFACE parent 1:1 classid 1:20 htb \
-        rate $[33*$USPEED/100]kbit ceil $[95*$USPEED/100]kbit \
+        rate $[33*$USPEED/100]kbit ceil $[92*$USPEED/100]kbit \
         prio 2 $COMMONOPTIONS
 
     # LOW 1:30
 
     tc class add dev $IFACE parent 1:1 classid 1:30 htb \
-        rate $[29*$USPEED/100]kbit ceil $[90*$USPEED/100]kbit \
+        rate $[24*$USPEED/100]kbit ceil $[90*$USPEED/100]kbit \
         prio 3 $COMMONOPTIONS
 
     # SFQ
@@ -189,18 +189,18 @@ then
         match ip tos 0x10 0xff  flowid 1:10
 
     # ICMP 1:10:    
-    tc filter add dev $IFACE parent 1: protocol ip prio 8 u32 \
+    tc filter add dev $IFACE parent 1: protocol ip prio 7 u32 \
         match ip protocol 1 0xff flowid 1:10
 
     # PACKETS < 128 bytes 1:10:
-    tc filter add dev $IFACE parent 1: protocol ip prio 9 u32 \
+    tc filter add dev $IFACE parent 1: protocol ip prio 8 u32 \
         match ip protocol 6 0xff \
         match u8 0x05 0x0f at 0 \
         match u16 0x0000 0xff80 at 2 \
         flowid 1:10
 	
-     # UDP Traffic
-     tc filter add dev $IFACE parent 1: protocol ip prio 10 u32 \
+     # UDP 1:10
+     tc filter add dev $IFACE parent 1: protocol ip prio 8 u32 \
      match ip protocol 17 0xff \
      flowid 1:10
 
@@ -208,18 +208,18 @@ then
 
     for a in $INTERACTIVE_PORT
     do
-        tc filter add dev $IFACE parent 1: protocol ip prio 12 u32 \
+        tc filter add dev $IFACE parent 1: protocol ip prio 10 u32 \
             match ip dport $a 0xffff flowid 1:20
-        tc filter add dev $IFACE parent 1: protocol ip prio 12 u32 \
+        tc filter add dev $IFACE parent 1: protocol ip prio 10 u32 \
             match ip sport $a 0xffff flowid 1:20
 
     done
     
     for b in $INTERACTIVE_PORT
     do
-        tc filter add dev $LANFACE parent 2: protocol ip prio 13 u32 \
+        tc filter add dev $LANFACE parent 2: protocol ip prio 11 u32 \
             match ip dport $b 0xffff flowid 2:10
-        tc filter add dev $LANFACE parent 2: protocol ip prio 13 u32 \
+        tc filter add dev $LANFACE parent 2: protocol ip prio 11 u32 \
             match ip sport $b 0xffff flowid 2:10
 	
     done
@@ -228,9 +228,9 @@ then
 
     for c in $HIPRIOPORTDST
     do
-        tc filter add dev $IFACE parent 1: protocol ip prio 15 u32 \
+        tc filter add dev $IFACE parent 1: protocol ip prio 12 u32 \
             match ip dport $c 0xffff flowid 1:20
-        tc filter add dev $LANFACE parent 2: protocol ip prio 15 u32 \
+        tc filter add dev $LANFACE parent 2: protocol ip prio 12 u32 \
             match ip dport $c 0xffff flowid 2:20
     done
     
@@ -238,15 +238,15 @@ then
 
     for d in $HIPRIOPORTSRC
     do
-        tc filter add dev $IFACE parent 1: protocol ip prio 16 u32 \
+        tc filter add dev $IFACE parent 1: protocol ip prio 13 u32 \
             match ip sport $d 0xffff flowid 1:20
-        tc filter add dev $LANFACE parent 2: protocol ip prio 16 u32 \
+        tc filter add dev $LANFACE parent 2: protocol ip prio 13 u32 \
             match ip sport $d 0xffff flowid 2:20
     done
 
     # REST of traffic MEDIUM
 
-    tc filter add dev $IFACE parent 1: protocol ip prio 17 u32 \
+    tc filter add dev $IFACE parent 1: protocol ip prio 15 u32 \
         match ip dst 0.0.0.0/0 flowid 1:20
 
     tc filter add dev $LANFACE parent 2: protocol ip prio 5 u32 \
@@ -262,19 +262,19 @@ then
 
     for f in $NOPRIOPORTSRC
     do
-        tc filter add dev $IFACE parent 1: protocol ip prio 19 u32 \
+        tc filter add dev $IFACE parent 1: protocol ip prio 18 u32 \
             match ip sport $f 0xffff flowid 1:30
     done
 
     for g in $NOPRIOHOSTSRC
     do
-        tc filter add dev $IFACE parent 1: protocol ip prio 20 u32 \
+        tc filter add dev $IFACE parent 1: protocol ip prio 19 u32 \
             match ip src $g flowid 1:30
     done
 
     for h in $NOPRIOHOSTDST
     do
-        tc filter add dev $IFACE parent 1: protocol ip prio 21 u32 \
+        tc filter add dev $IFACE parent 1: protocol ip prio 19 u32 \
             match ip dst $h flowid 1:30
     done
 fi
@@ -288,10 +288,14 @@ then
     modprobe ifb
     ip link set dev $IFB up
     ip link set dev $IFB1 up
-    ip link set dev $IFB txqueuelen 32
-    ip link set dev $IFB1 txqueuelen 32
+    ip link set dev $IFB txqueuelen 2
+    ip link set dev $IFB1 txqueuelen 2
+    ip link set dev eth2 txqueuelen 2
+    ip link set dev eth3 txqueuelen 2
     ip link set mtu 1500 dev $IFB
     ip link set mtu 1500 dev $IFB1
+    ip link set mtu 1500 dev eth2
+    ip link set mtu 1500 dev eth3
 
     # Ingress to egress ifb0 and ifb1 WAN and LAN
     tc qdisc add dev $IFACE handle ffff: ingress
@@ -316,4 +320,9 @@ then
     tc filter add dev $IFB1 protocol ip parent 4: prio 10 u32 match ip src $LANMASK flowid 4:1
 
 fi
+
+# Bufferbloat sysctl countermeasures.
+sysctl -w net.ipv4.tcp_ecn=1
+sysctl -w net.ipv4.tcp_sack=1
+sysctl -w net.ipv4.tcp_dsack=1
 
