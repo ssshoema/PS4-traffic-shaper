@@ -8,7 +8,7 @@
 QUANTUM=1500
 BURST=15k
 COMMONOPTIONS="$COMMONOPTIONS"
-VERSION=1.4
+VERSION=1.0
 
 usage()
 {
@@ -41,6 +41,7 @@ IFACE=
 IFB="ifb0"
 IFB1="ifb1"
 MODE=
+#Change to match your LAN
 LANFACE="eth0"
 LANMASK="10.42.0.0/24"
 LANSPEED="100mbit"
@@ -120,10 +121,10 @@ NOPRIOHOSTSRC=
 NOPRIOHOSTDST=
 
 # LOW priority source ports
-NOPRIOPORTSRC="22 33001 7777 8134"
+NOPRIOPORTSRC="80 443 22 33001 7777 8134"
 
 # LOW priority destination ports
-NOPRIOPORTDST="22 33001 7777 8134"
+NOPRIOPORTDST="80 443 22 33001 7777 8134"
 
 # HIGH priority destination ports for PS4
 HIPRIOPORTDST="2001 3074 3075 7500 7501 7502 7503 7504 7505 7506 7507 7508 7509 28608 30000 30001 30002 30003 30004 30005 30006 30007 30008 30009"
@@ -256,14 +257,18 @@ then
     
     for e in $NOPRIOPORTDST
     do
-        tc filter add dev $IFACE parent 1: protocol ip prio 18 u32 \
+        tc filter add dev $IFACE parent 1: protocol ip prio 17 u32 \
             match ip dport $e 0xffff flowid 1:30
+        tc filter add dev $LANFACE parent 2: protocol ip prio 17 u32 \
+            match ip dport $e 0xffff flowid 2:30
     done
 
     for f in $NOPRIOPORTSRC
     do
         tc filter add dev $IFACE parent 1: protocol ip prio 18 u32 \
             match ip sport $f 0xffff flowid 1:30
+        tc filter add dev $LANFACE parent 2: protocol ip prio 18 u32 \
+            match ip dport $e 0xffff flowid 2:30
     done
 
     for g in $NOPRIOHOSTSRC
@@ -290,12 +295,12 @@ then
     ip link set dev $IFB1 up
     ip link set dev $IFB txqueuelen 2
     ip link set dev $IFB1 txqueuelen 2
-    ip link set dev eth2 txqueuelen 2
-    ip link set dev eth3 txqueuelen 2
+    ip link set dev $IFACE txqueuelen 2
+    ip link set dev $LANFACE txqueuelen 2
     ip link set mtu 1500 dev $IFB
     ip link set mtu 1500 dev $IFB1
-    ip link set mtu 1500 dev eth2
-    ip link set mtu 1500 dev eth3
+    ip link set mtu 1500 dev $IFACE
+    ip link set mtu 1500 dev $LANFACE
 
     # Ingress to egress ifb0 and ifb1 WAN and LAN
     tc qdisc add dev $IFACE handle ffff: ingress
