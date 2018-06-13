@@ -127,10 +127,10 @@ NOPRIOPORTSRC="80 443 22 33001 7777 8134"
 NOPRIOPORTDST="80 443 22 33001 7777 8134"
 
 # HIGH priority destination ports for PS4
-HIPRIOPORTDST="2001 3074 3075 7500 7501 7502 7503 7504 7505 7506 7507 7508 7509 28608 30000 30001 30002 30003 30004 30005 30006 30007 30008 30009"
+HIPRIOPORTDST="2001 3075 7500 7501 7502 7503 7504 7505 7506 7507 7508 7509 28608 30000 30001 30002 30003 30004 30005 30006 30007 30008 30009"
 
 # HIGH priority source ports for PS4
-HIPRIOPORTSRC="2001 3074 3075 7500 7501 7502 7503 7504 7505 7506 7507 7508 7509 28608 30000 30001 30002 30003 30004 30005 30006 30007 30008 30009"
+HIPRIOPORTSRC="2001 3075 7500 7501 7502 7503 7504 7505 7506 7507 7508 7509 28608 30000 30001 30002 30003 30004 30005 30006 30007 30008 30009"
 
 ###### UPLINK
 
@@ -161,19 +161,19 @@ then
     # HIGH 1:10:
 
     tc class add dev $IFACE parent 1:1 classid 1:10 htb \
-        rate $[43*$USPEED/100]kbit ceil $[95*$USPEED/100]kbit \
+        rate $[38*$USPEED/100]kbit ceil $[97*$USPEED/100]kbit \
         prio 1 $COMMONOPTIONS
 
     # MEDIUM 1:20
 
     tc class add dev $IFACE parent 1:1 classid 1:20 htb \
-        rate $[33*$USPEED/100]kbit ceil $[92*$USPEED/100]kbit \
+        rate $[35*$USPEED/100]kbit ceil $[95*$USPEED/100]kbit \
         prio 2 $COMMONOPTIONS
 
     # LOW 1:30
 
     tc class add dev $IFACE parent 1:1 classid 1:30 htb \
-        rate $[24*$USPEED/100]kbit ceil $[90*$USPEED/100]kbit \
+        rate $[27*$USPEED/100]kbit ceil $[90*$USPEED/100]kbit \
         prio 3 $COMMONOPTIONS
 
     # SFQ
@@ -210,18 +210,26 @@ then
     for a in $INTERACTIVE_PORT
     do
         tc filter add dev $IFACE parent 1: protocol ip prio 10 u32 \
-            match ip dport $a 0xffff flowid 1:20
+            match ip dport $b 0xffff \
+	    match ip protocol 0x11 0xff \
+	    flowid 1:10
         tc filter add dev $IFACE parent 1: protocol ip prio 10 u32 \
-            match ip sport $a 0xffff flowid 1:20
+            match ip dport $b 0xffff \
+	    match ip protocol 0x11 0xff \
+	    flowid 1:10
 
     done
     
     for b in $INTERACTIVE_PORT
     do
         tc filter add dev $LANFACE parent 2: protocol ip prio 11 u32 \
-            match ip dport $b 0xffff flowid 2:10
+            match ip dport $b 0xffff \
+	    match ip protocol 0x11 0xff \
+	    flowid 2:10
         tc filter add dev $LANFACE parent 2: protocol ip prio 11 u32 \
-            match ip sport $b 0xffff flowid 2:10
+            match ip sport $b 0xffff \
+	    match ip protocol 0x11 0xff \
+	    flowid 2:10
 	
     done
     
@@ -231,27 +239,27 @@ then
     do
         tc filter add dev $IFACE parent 1: protocol ip prio 12 u32 \
             match ip dport $c 0xffff flowid 1:20
-        tc filter add dev $LANFACE parent 2: protocol ip prio 12 u32 \
-            match ip dport $c 0xffff flowid 2:20
+        tc filter add dev $IFACE parent 1: protocol ip prio 12 u32 \
+            match ip sport $c 0xffff flowid 1:20
     done
     
     #PS4 source ports.
 
     for d in $HIPRIOPORTSRC
     do
-        tc filter add dev $IFACE parent 1: protocol ip prio 13 u32 \
-            match ip sport $d 0xffff flowid 1:20
+        tc filter add dev $LANFACE parent 2: protocol ip prio 13 u32 \
+            match ip dport $d 0xffff flowid 2:20
         tc filter add dev $LANFACE parent 2: protocol ip prio 13 u32 \
             match ip sport $d 0xffff flowid 2:20
     done
 
-    # REST of traffic MEDIUM
+    # REST of traffic
 
     tc filter add dev $IFACE parent 1: protocol ip prio 15 u32 \
-        match ip dst 0.0.0.0/0 flowid 1:20
+        match ip dst 0.0.0.0/0 flowid 1:30
 
     tc filter add dev $LANFACE parent 2: protocol ip prio 5 u32 \
-        match ip dst 0.0.0.0/0 flowid 2:20
+        match ip dst 0.0.0.0/0 flowid 2:30
 
     # LOW priority traffic.
     
@@ -259,16 +267,16 @@ then
     do
         tc filter add dev $IFACE parent 1: protocol ip prio 17 u32 \
             match ip dport $e 0xffff flowid 1:30
-        tc filter add dev $LANFACE parent 2: protocol ip prio 17 u32 \
-            match ip dport $e 0xffff flowid 2:30
+        tc filter add dev $IFACE parent 1: protocol ip prio 17 u32 \
+            match ip sport $e 0xffff flowid 1:30
     done
 
     for f in $NOPRIOPORTSRC
     do
-        tc filter add dev $IFACE parent 1: protocol ip prio 18 u32 \
-            match ip sport $f 0xffff flowid 1:30
         tc filter add dev $LANFACE parent 2: protocol ip prio 18 u32 \
-            match ip dport $e 0xffff flowid 2:30
+            match ip dport $f 0xffff flowid 2:30
+        tc filter add dev $LANFACE parent 2: protocol ip prio 18 u32 \
+            match ip sport $e 0xffff flowid 2:30
     done
 
     for g in $NOPRIOHOSTSRC
@@ -322,6 +330,7 @@ then
     # Filters
     tc filter add dev $IFB protocol ip parent 3: prio 1 u32 match ip src 0.0.0.0/0 flowid 3:1
     tc filter add dev $IFB1 protocol ip parent 4: prio 1 u32 match ip src 10.42.0.201/32 flowid 4:1
+    tc filter add dev $IFB1 protocol ip parent 4: prio 1 u32 match ip dst 10.42.0.201/32 flowid 4:1
     tc filter add dev $IFB1 protocol ip parent 4: prio 10 u32 match ip src $LANMASK flowid 4:1
 
 fi
