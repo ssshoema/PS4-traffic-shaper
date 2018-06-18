@@ -161,19 +161,19 @@ then
     # HIGH 1:10:
 
     tc class add dev $IFACE parent 1:1 classid 1:10 htb \
-        rate $[43*$USPEED/100]kbit ceil $[95*$USPEED/100]kbit \
+        rate $[40*$USPEED/100]kbit ceil $[95*$USPEED/100]kbit \
         prio 1 $COMMONOPTIONS
 
     # MEDIUM 1:20
 
     tc class add dev $IFACE parent 1:1 classid 1:20 htb \
-        rate $[30*$USPEED/100]kbit ceil $[92*$USPEED/100]kbit \
+        rate $[31*$USPEED/100]kbit ceil $[92*$USPEED/100]kbit \
         prio 2 $COMMONOPTIONS
 
     # LOW 1:30
 
     tc class add dev $IFACE parent 1:1 classid 1:30 htb \
-        rate $[27*$USPEED/100]kbit ceil $[90*$USPEED/100]kbit \
+        rate $[29*$USPEED/100]kbit ceil $[90*$USPEED/100]kbit \
         prio 3 $COMMONOPTIONS
 
     # SFQ
@@ -245,13 +245,22 @@ then
             match ip sport $d 0xffff flowid 2:20
     done
 
-    # REST of traffic MEDIUM
+    # Bungie Servers via ARIN then rest of traffic.
+    tc filter add dev $IFACE protocol ip parent 1: prio 15 u32 match ip dst 172.97.56.0/22 flowid 1:20
+    tc filter add dev $IFACE protocol ip parent 1: prio 15 u32 match ip dst 205.209.16.0/21 flowid 1:20
+    tc filter add dev $IFACE protocol ip parent 1: prio 15 u32 match ip dst 205.209.20.0/24 flowid 1:20
+    tc filter add dev $IFACE protocol ip parent 1: prio 15 u32 match ip dst 205.209.21.0/24 flowid 1:20
+    tc filter add dev $IFACE protocol ip parent 1: prio 15 u32 match ip dst 205.234.118.0/23 flowid 1:20
 
-    tc filter add dev $IFACE parent 1: protocol ip prio 15 u32 \
-        match ip dst 0.0.0.0/0 flowid 1:30
+    tc filter add dev $IFACE parent 1: protocol ip prio 16 u32 match ip dst 0.0.0.0/0 flowid 1:30
 
-    tc filter add dev $LANFACE parent 2: protocol ip prio 5 u32 \
-        match ip dst 0.0.0.0/0 flowid 2:30
+    tc filter add dev $LANFACE protocol ip parent 2: prio 5 u32 match ip dst 172.97.56.0/22 flowid 2:20
+    tc filter add dev $LANFACE protocol ip parent 2: prio 5 u32 match ip dst 205.209.16.0/21 flowid 2:20
+    tc filter add dev $LANFACE protocol ip parent 2: prio 5 u32 match ip dst 205.209.20.0/24 flowid 2:20
+    tc filter add dev $LANFACE protocol ip parent 2: prio 5 u32 match ip dst 205.209.21.0/24 flowid 2:20
+    tc filter add dev $LANFACE protocol ip parent 2: prio 5 u32 match ip dst 205.234.118.0/23 flowid 2:20
+    
+    tc filter add dev $LANFACE parent 2: protocol ip prio 6 u32 match ip dst 0.0.0.0/0 flowid 2:30
 
     # LOW priority traffic.
     
@@ -316,11 +325,18 @@ then
     tc qdisc add dev $IFB root handle 3: htb
     tc qdisc add dev $IFB1 root handle 4: htb
 
-    tc class add dev $IFB parent 3: classid 3:1 htb rate ${DSPEED}kbit 
+    tc class add dev $IFB parent 3: classid 3:1 htb rate ${DSPEED}kbit
+    tc class add dev $IFB parent 3: classid 3:2 htb rate $[50*$DSPEED/100]kbit 
     tc class add dev $IFB1 parent 4: classid 4:1 htb rate $LANSPEED
+    tc class add dev $IFB1 parent 4: classid 4:2 htb rate $[50*LANSPEEDD/100]kbit
     
     # Filters
-    tc filter add dev $IFB protocol ip parent 3: prio 1 u32 match ip src 0.0.0.0/0 flowid 3:1
+    tc filter add dev $IFB protocol ip parent 3: prio 1 u32 match ip src 172.97.56.0/22 flowid 3:1
+    tc filter add dev $IFB protocol ip parent 3: prio 1 u32 match ip src 205.209.16.0/21 flowid 3:1
+    tc filter add dev $IFB protocol ip parent 3: prio 1 u32 match ip src 205.209.20.0/24 flowid 3:1
+    tc filter add dev $IFB protocol ip parent 3: prio 1 u32 match ip src 205.209.21.0/24 flowid 3:1
+    tc filter add dev $IFB protocol ip parent 3: prio 1 u32 match ip src 205.234.118.0/23 flowid 3:1
+    tc filter add dev $IFB protocol ip parent 3: prio 10 u32 match ip src 0.0.0.0/0 flowid 3:2
     tc filter add dev $IFB1 protocol ip parent 4: prio 1 u32 match ip src 10.42.0.201/32 flowid 4:1
     tc filter add dev $IFB1 protocol ip parent 4: prio 10 u32 match ip src $LANMASK flowid 4:1
 
