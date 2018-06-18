@@ -198,6 +198,7 @@ then
         match ip protocol 6 0xff \
         match u8 0x05 0x0f at 0 \
         match u16 0x0000 0xff80 at 2 \
+	match ip nofrag  \
         flowid 1:10
 	
      # UDP 1:10
