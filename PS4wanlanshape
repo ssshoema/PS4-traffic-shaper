@@ -5,9 +5,12 @@
 #
 # License GPLv2 <https://gnu.org/licenses/gpl-2.0.html>
 
+# QUANTUM based on your MTU.
 QUANTUM=1514
+# Burst and cburst are typically set to 10% of your upload speed. Keep this minimal.
 BURST=1.8k
 CBURST=1.8k
+# Commonon options are HTB alogorythim internal calcualtions.
 COMMONOPTIONS="$COMMONOPTIONS"
 VERSION=1.0
 
@@ -42,7 +45,9 @@ IFACE=
 IFB="ifb0"
 IFB1="ifb1"
 MODE=
+# Set this to your LAN interface.
 LANFACE="eth2"
+# LAN netwrok mask and LAN speed.
 LANMASK="10.42.0.0/24"
 LANSPEED="100mbit"
 
@@ -113,29 +118,22 @@ then
     exit 1
 fi
 
-#Interactive Port PS4
+#Interactive Port PS4 (and other gaming systems)
 INTERACTIVE_PORT=3074
 
-# OUTGOING traffic
-#PS4 STATIC IP HIGH
+# Set PS4 STATIC IP HIGH. You must set a stic IP to your PS4. both inbound and outbound.
 HIPRIOHOSTSRC=10.42.0.201/32
-
-# PS4 STATIC IP HIGH
 HIPRIOHOSTDST=10.42.0.201/32
 
-# LOW priority source ports
+# If you have any inbound or outound ports for web services, set them to a lower piority both inbound and outbound.
 NOPRIOPORTSRC="22 33001 7777 8134"
-
-# LOW priority destination ports
 NOPRIOPORTDST="22 33001 7777 8134"
 
-# HIGH priority destination ports for PS4
+# HIGH priority destination and source ports for PS4. Derive from Bungie and IPTRAF logs.
 HIPRIOPORTDST="53 5353 443 2001 3075 7500 7501 7502 7503 7504 7505 7506 7507 7508 7509 28608 30000 30001 30002 30003 30004 30005 30006 30007 30008 30009"
-
-# HIGH priority source ports for PS4
 HIPRIOPORTSRC="53 5353 443 2001 3075 7500 7501 7502 7503 7504 7505 7506 7507 7508 7509 28608 30000 30001 30002 30003 30004 30005 30006 30007 30008 30009"
 
-# BUNGIE IP
+# BUNGIE IP CDN - https://ipinfo.io/AS394073
 BUNGIEIP="172.97.56.0/22 205.209.16.0/21 205.209.20.0/24 205.209.21.0/24 205.234.118.0/23"
 
 ###### UPLINK
@@ -145,7 +143,7 @@ BUNGIEIP="172.97.56.0/22 205.209.16.0/21 205.209.20.0/24 205.209.21.0/24 205.234
 tc qdisc add dev $IFACE root handle 1: htb \
     default 20
 
-# ROOT HTB AND LAN CLASS
+# ROOT HTB AND LAN 
 tc qdisc add dev $LANFACE root handle 2: htb \
   default 10
 
@@ -212,7 +210,7 @@ then
      match ip protocol 17 0xff \
      flowid 1:10
 
-    # Interactive Port
+    # Interactive Port of PS4
 
     for a in $INTERACTIVE_PORT
     do
@@ -225,9 +223,9 @@ then
 
     for b in $INTERACTIVE_PORT
     do
-        tc filter add dev $LANFACE parent 2: protocol ip prio 13 u32 \
+        tc filter add dev $LANFACE parent 2: protocol ip prio 12 u32 \
             match ip dport $b 0xffff flowid 2:10
-        tc filter add dev $LANFACE parent 2: protocol ip prio 13 u32 \
+        tc filter add dev $LANFACE parent 2: protocol ip prio 12 u32 \
             match ip sport $b 0xffff flowid 2:10
 
     done
@@ -236,7 +234,7 @@ then
 
     for c in $HIPRIOPORTDST
     do
-        tc filter add dev $IFACE parent 1: protocol ip prio 15 u32 \
+        tc filter add dev $IFACE parent 1: protocol ip prio 13 u32 \
             match ip dport $c 0xffff flowid 1:20
         tc filter add dev $LANFACE parent 2: protocol ip prio 15 u32 \
             match ip dport $c 0xffff flowid 2:20
@@ -246,18 +244,18 @@ then
 
     for d in $HIPRIOPORTSRC
     do
-        tc filter add dev $IFACE parent 1: protocol ip prio 16 u32 \
+        tc filter add dev $IFACE parent 1: protocol ip prio 13 u32 \
             match ip sport $d 0xffff flowid 1:20
-        tc filter add dev $LANFACE parent 2: protocol ip prio 16 u32 \
+        tc filter add dev $LANFACE parent 2: protocol ip prio 15 u32 \
             match ip sport $d 0xffff flowid 2:20
     done
 
     # REST of traffic MEDIUM
 
-    tc filter add dev $IFACE parent 1: protocol ip prio 18 u32 \
+    tc filter add dev $IFACE parent 1: protocol ip prio 16 u32 \
         match ip dst 0.0.0.0/0 flowid 1:30
 
-    tc filter add dev $LANFACE parent 2: protocol ip prio 5 u32 \
+    tc filter add dev $LANFACE parent 2: protocol ip prio 16 u32 \
         match ip dst 0.0.0.0/0 flowid 2:20
 
     # Priority traffic.
@@ -296,8 +294,10 @@ then
     modprobe ifb
     ip link set dev $IFB up
     ip link set dev $IFB1 up
+ # Setting txqueuelen to 2 reduces buffer.
     ip link set dev $IFB txqueuelen 2
     ip link set dev $IFB1 txqueuelen 2
+ # Setting MTU to match netwrok MTU.
     ip link set mtu 1500 dev $IFB
     ip link set mtu 1500 dev $IFB1
 
@@ -320,17 +320,19 @@ then
     tc class add dev $IFB1 parent 4: classid 4:1 htb rate $LANSPEED
 
     # Filters
+    # Bungie IP CDN gets top priority.
     for i in $BUNGIEIP
     do
     tc filter add dev $IFB parent 3: protocol ip prio 1 u32 match ip src $i flowid 3:1
-    done 
+    done
+    
     tc filter add dev $IFB protocol ip parent 3: prio 10 u32 match ip src 0.0.0.0/0 flowid 3:2
+    
+    # PS4 gets LAN priority with static IP on PS4
     tc filter add dev $IFB1 protocol ip parent 4: prio 10 u32 match ip src $LANMASK flowid 4:1
     tc filter add dev $IFB1 protocol ip parent 4: prio 1 u32 match ip src 10.42.0.201/32 flowid 4:1
 fi
-# Bufferbloat mediation
+# Bufferbloat mediation with txqueuelen and reduction of ring buffer on eth3.
 ifconfig -a eth3 txqueuelen 2
 ifconfig -a eth2 txqueuelen 2
-ifconfig -a ifb0 txqueuelen 2
-ifconfig -a ifb1 txqueuelen 2
 ethtool -G eth3 tx 20
