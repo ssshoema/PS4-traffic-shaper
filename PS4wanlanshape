@@ -1,7 +1,5 @@
 #!/bin/bash
-#
-# Set the following values to somewhat less than your actual download
-# and uplink speed. In kilobits. Also set the device that is to be shaped.
+# Consult the README for usage.
 #
 # License GPLv2 <https://gnu.org/licenses/gpl-2.0.html>
 
@@ -118,10 +116,10 @@ then
     exit 1
 fi
 
-#Interactive Port PS4 (and other gaming systems)
+# Interactive Port PS4 (and other gaming systems).
 INTERACTIVE_PORT=3074
 
-# Set PS4 STATIC IP HIGH. You must set a stic IP to your PS4. both inbound and outbound.
+# Set PS4 STATIC IP HIGH. You must set a static IP to your PS4. Both inbound and outbound.
 HIPRIOHOSTSRC=10.42.0.201/32
 HIPRIOHOSTDST=10.42.0.201/32
 
@@ -129,7 +127,7 @@ HIPRIOHOSTDST=10.42.0.201/32
 NOPRIOPORTSRC="22 33001 7777 8134"
 NOPRIOPORTDST="22 33001 7777 8134"
 
-# HIGH priority destination and source ports for PS4. Derive from Bungie and IPTRAF logs.
+# HIGH priority destination and source ports for PS4. Derived from Bungie and IPTRAF logs.
 HIPRIOPORTDST="53 5353 443 2001 3075 7500 7501 7502 7503 7504 7505 7506 7507 7508 7509 28608 30000 30001 30002 30003 30004 30005 30006 30007 30008 30009"
 HIPRIOPORTSRC="53 5353 443 2001 3075 7500 7501 7502 7503 7504 7505 7506 7507 7508 7509 28608 30000 30001 30002 30003 30004 30005 30006 30007 30008 30009"
 
@@ -143,7 +141,7 @@ BUNGIEIP="172.97.56.0/22 205.209.16.0/21 205.209.20.0/24 205.209.21.0/24 205.234
 tc qdisc add dev $IFACE root handle 1: htb \
     default 20
 
-# ROOT HTB AND LAN 
+# ROOT HTB AND LAN classes.
 tc qdisc add dev $LANFACE root handle 2: htb \
   default 10
 
@@ -258,7 +256,7 @@ then
     tc filter add dev $LANFACE parent 2: protocol ip prio 16 u32 \
         match ip dst 0.0.0.0/0 flowid 2:20
 
-    # Priority traffic.
+    # Lower priority traffic.
 
     for e in $NOPRIOPORTDST
     do
@@ -272,6 +270,7 @@ then
             match ip sport $f 0xffff flowid 1:30
     done
 
+# WAN pritory OUTBOUND to the host Bungie CDN network.
     for g in $HIPRIOHOSTSRC
     do
         tc filter add dev $IFACE parent 1: protocol ip prio 14 u32 \
@@ -320,7 +319,7 @@ then
     tc class add dev $IFB1 parent 4: classid 4:1 htb rate $LANSPEED
 
     # Filters
-    # Bungie IP CDN gets top priority.
+    # Bungie INBOUND IP CDN gets top priority.
     for i in $BUNGIEIP
     do
     tc filter add dev $IFB parent 3: protocol ip prio 1 u32 match ip src $i flowid 3:1
